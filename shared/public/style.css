@@ -103,7 +103,9 @@
   --glass-media: rgba(11, 13, 18, 0.45);
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+*, *::before, *::after { box-sizing: border-box; }
+
+* { -webkit-tap-highlight-color: transparent; }
 
 /* Атрибут hidden должен побеждать любые display из классов.
    Без этого, например, .grid { display: grid } перебивает скрытие
@@ -113,6 +115,8 @@
 html, body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
   background: var(--color-bg);
 }
@@ -125,7 +129,14 @@ body {
   line-height: 1.35;
   color: var(--label);
   -webkit-font-smoothing: antialiased;
+
+  /* Страховка от горизонтальной прокрутки — только на body.
+     На html это же правило делает его скролл-контейнером и ломает
+     position: sticky у навбара. */
   overflow-x: hidden;
+
+  overflow-wrap: break-word; /* длинные слова не раздвигают карточки */
+  word-wrap: break-word;
   transition: background-color var(--theme-shift), color var(--theme-shift);
 }
 
@@ -245,6 +256,8 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 .hero { padding: calc(22px + env(safe-area-inset-top)) 16px 4px; }
 
 .hero__brand {
+  display: inline-block;
+  cursor: pointer;
   margin-bottom: 4px;
   font-size: 12.5px;
   font-weight: 600;
@@ -695,48 +708,27 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   position: sticky;
   top: 0;
   z-index: 15;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  justify-content: center;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
   border-bottom: 0.5px solid var(--color-line);
 }
 
-.navbar__back {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 2px;
-  border: 0;
-  background: none;
-  color: var(--color-accent);
-  font-size: 17px;
-  letter-spacing: -0.4px;
-  cursor: pointer;
-  justify-self: start;
-  transition: opacity 0.2s ease, color var(--theme-shift);
-}
-
-.navbar__back:active { opacity: 0.4; }
-
-/* Шеврон «‹» рисуем сами — так он точнее совпадает с iOS */
-.navbar__chevron {
-  width: 9px;
-  height: 9px;
-  border-left: 2.2px solid currentColor;
-  border-bottom: 2.2px solid currentColor;
-  border-radius: 1px;
-  transform: rotate(45deg);
-  margin-right: 1px;
-}
-
+/* Заголовок кликабелен: запасной способ вернуться там,
+   где нет системной кнопки «назад» (например, в браузере) */
 .navbar__titles {
   display: flex;
   flex-direction: column;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
+
+.navbar__titles:active { opacity: 0.5; }
 
 .navbar__title {
   font-size: 16px;
@@ -745,7 +737,7 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 55vw;
+  max-width: 100%;
 }
 
 .navbar__subtitle {
@@ -755,19 +747,28 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 55vw;
+  max-width: 100%;
 }
-
-.navbar__spacer { justify-self: end; }
 
 /* ── Контент экрана детали ──────────────────────────────── */
 .content {
   display: grid;
+
+  /* Колонка обязательно minmax(0, 1fr): у грида неявная auto-колонка
+     растягивается до max-content своего содержимого, и лента этажей
+     (десять кнопок) раздувала весь экран шире телефона. */
+  grid-template-columns: minmax(0, 1fr);
+
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
   padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
 }
 
 .card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 16px;
   border-radius: var(--r-card);
   background: var(--color-card);
@@ -821,8 +822,12 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 @keyframes breathe { 50% { opacity: 0.25; } }
 
 /* ── Выбор этажа назначения ─────────────────────────────── */
+/* Единственное место на экране с горизонтальной прокруткой */
 .floors {
   display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   gap: 8px;
   margin-top: 10px;
   padding-bottom: 2px;
@@ -887,7 +892,12 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 }
 
 /* ── Карточки статистики ────────────────────────────────── */
-.stats { display: grid; gap: 12px; }
+.stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* по той же причине, что и .content */
+  gap: 12px;
+  min-width: 0;
+}
 
 .metric { --status: var(--label-2); }
 
@@ -905,6 +915,8 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 
 .metric__value {
   display: block;
+  min-width: 0;
+  overflow-wrap: break-word;
   font-size: 34px;
   line-height: 1.1;
   font-weight: 600;
@@ -941,7 +953,9 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
+  min-width: 0;
   padding: 9px 0;
   font-size: 15px;
   color: var(--label-2);
@@ -949,7 +963,12 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   transition: color 0.3s ease, border-color var(--theme-shift);
 }
 
-.compare__name { display: flex; align-items: center; gap: 8px; }
+.compare__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* иначе длинная подпись растянет строку наружу */
+}
 
 .compare__emoji { font-size: 15px; line-height: 1; }
 

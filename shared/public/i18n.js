@@ -42,7 +42,6 @@
       'foot.updatedAt': 'обновлено в {time}',
       'foot.note': 'Данные тестовые. Камеры подключим позже.',
 
-      'detail.back': 'Назад',
       'detail.destination': 'Куда едешь?',
       'detail.camera': 'Онлайн-камера',
       'detail.cameraCaption': 'Камера: Холл, {floor} этаж',
@@ -104,7 +103,8 @@
 
       'a11y.theme': 'Переключить тему',
       'a11y.lang': 'Переключить язык',
-      'a11y.sys': 'Свободных лифтов — к началу списка'
+      'a11y.sys': 'Свободных лифтов — к началу списка',
+      'a11y.home': 'Вернуться к списку лифтов'
     },
 
     en: {
@@ -130,7 +130,6 @@
       'foot.updatedAt': 'updated at {time}',
       'foot.note': 'Test data. Cameras will be connected later.',
 
-      'detail.back': 'Back',
       'detail.destination': 'Where are you going?',
       'detail.camera': 'Live camera',
       'detail.cameraCaption': 'Camera: hall, floor {floor}',
@@ -191,7 +190,8 @@
 
       'a11y.theme': 'Switch theme',
       'a11y.lang': 'Switch language',
-      'a11y.sys': 'Free elevators — scroll to top'
+      'a11y.sys': 'Free elevators — scroll to top',
+      'a11y.home': 'Back to the elevator list'
     }
   };
 

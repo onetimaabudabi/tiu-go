@@ -85,7 +85,8 @@
     emptyRetry: $('empty-retry'),
     emptyRetryText: $('empty-retry-text'),
     updated: $('updated'),
-    back: $('back'),
+    brand: $('brand'),
+    detailHome: $('detail-home'),
     detailTitle: $('detail-title'),
     detailSubtitle: $('detail-subtitle'),
     destination: $('destination'),
@@ -232,20 +233,30 @@
 
     // Системная кнопка «назад» в Telegram
     if (tg && tg.BackButton && tg.BackButton.onClick) {
-      try { tg.BackButton.onClick(showHome); } catch (e) {}
+      try { tg.BackButton.onClick(closeDetail); } catch (e) {}
+    }
+
+    // Системная кнопка «назад» в MAX.
+    // TODO: сверить имя события и объект с документацией — https://dev.max.ru/docs
+    if (mx) {
+      try {
+        if (mx.BackButton && mx.BackButton.onClick) mx.BackButton.onClick(closeDetail);
+        else if (typeof mx.on === 'function') mx.on('back', closeDetail);
+      } catch (e) {}
     }
 
     applyTheme(currentTheme()); // синхронизируем иконку и цвета клиента
   }
 
-  /** Переключает системную кнопку «назад», если платформа её поддерживает. */
+  /** Показывает или прячет системную кнопку «назад» клиента. */
   function toggleHostBackButton(visible) {
-    var tg = tgApp();
-    if (!tg || !tg.BackButton) return;
-    try {
-      if (visible) tg.BackButton.show();
-      else tg.BackButton.hide();
-    } catch (e) {}
+    [tgApp(), maxApp()].forEach(function (host) {
+      if (!host || !host.BackButton) return;
+      try {
+        if (visible) host.BackButton.show();
+        else host.BackButton.hide();
+      } catch (e) {}
+    });
   }
 
   /** Лёгкая тактильная отдача по тапу, если клиент умеет. */
@@ -1102,6 +1113,21 @@
     node.addEventListener('animationend', cleanup);
   }
 
+  /**
+   * Закрыть экран лифта. Вызывается системной кнопкой клиента, жестом
+   * «назад» и кликом по заголовку. Если экран открывали мы и записали
+   * состояние в историю — возвращаемся через историю, чтобы она не копилась.
+   */
+  function closeDetail() {
+    if (state.openId === null) return;
+
+    if (window.history.state && window.history.state.tiuGoDetail !== undefined) {
+      window.history.back(); // дальше сработает popstate и покажет главный экран
+    } else {
+      showHome();
+    }
+  }
+
   function showDetail(id) {
     state.openId = id;
 
@@ -1114,6 +1140,10 @@
     toggleHostBackButton(true);
     renderDetail();
     animateScreen(el.detail, 'screen--push');
+
+    // Отдельная запись в истории: без неё системный свайп «назад»
+    // закрывал бы всё мини-приложение, а не экран лифта.
+    try { window.history.pushState({ tiuGoDetail: id }, ''); } catch (e) {}
   }
 
   function showHome() {
@@ -1307,9 +1337,28 @@
     }, 2000);
   });
 
-  el.back.addEventListener('click', function () {
+  // Системный жест «назад» и кнопка браузера
+  window.addEventListener('popstate', function () {
+    if (state.openId !== null) showHome();
+  });
+
+  // Запасные способы вернуться там, где системной кнопки нет:
+  // заголовок экрана лифта и логотип в шапке
+  el.detailHome.addEventListener('click', function () {
     haptic();
-    showHome();
+    closeDetail();
+  });
+
+  el.detailHome.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeDetail();
+    }
+  });
+
+  el.brand.addEventListener('click', function () {
+    if (state.openId !== null) closeDetail();
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   el.refresh.addEventListener('click', function () {

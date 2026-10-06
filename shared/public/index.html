@@ -54,7 +54,7 @@
     </div>
 
     <header class="hero">
-      <p class="hero__brand">TIU GO</p>
+      <p class="hero__brand" id="brand">TIU GO</p>
       <div class="hero__row">
         <h1 class="hero__title" data-i18n="home.title">Лифты</h1>
 
@@ -138,16 +138,18 @@
   <section class="screen" id="screen-detail" hidden>
 
     <!-- Навигационная панель в стиле iOS: полупрозрачная, с размытием -->
+    <!--
+      Кнопки «Назад» внутри приложения нет: в Telegram и MAX для этого есть
+      системная стрелка в шапке клиента. Заголовок остаётся по центру и
+      работает запасным способом вернуться — в обычном браузере, где
+      системной кнопки нет.
+    -->
     <header class="navbar glass">
-      <button class="navbar__back" id="back" type="button">
-        <span class="navbar__chevron" aria-hidden="true"></span>
-        <span data-i18n="detail.back">Назад</span>
-      </button>
-      <div class="navbar__titles">
+      <div class="navbar__titles" id="detail-home" role="button" tabindex="0"
+           data-i18n-aria="a11y.home">
         <span class="navbar__title" id="detail-title">Лифт</span>
         <span class="navbar__subtitle" id="detail-subtitle">—</span>
       </div>
-      <span class="navbar__spacer" aria-hidden="true"></span>
     </header>
 
     <div class="content">
