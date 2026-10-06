@@ -25,8 +25,8 @@
 
   var THEME_BG = { dark: '#0B0D12', light: '#F7F8FA' };
 
-  // Сколько этажей показывать в выборе назначения
-  var DESTINATION_FLOORS = 10;
+  // Сколько этажей показывать в выборе назначения — вся высота корпуса
+  var DESTINATION_FLOORS = 16;
 
   // Причины жалобы: ключ уходит на сервер, подпись берётся из словаря
   var REPORT_REASONS = ['broken', 'slow', 'noise', 'dirty', 'other'];
@@ -371,6 +371,17 @@
     }
 
     el.destination.innerHTML = html;
+  }
+
+  /**
+   * Подкручивает ленту к выбранному этажу. Вызывается при открытии экрана:
+   * пока он скрыт, у кнопок нет геометрии и прокрутка не сработала бы.
+   */
+  function revealDestination() {
+    var active = el.destination.querySelector('.is-active');
+    if (active && active.scrollIntoView) {
+      active.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
   }
 
   function setDestination(floor) {
@@ -1139,6 +1150,7 @@
     window.scrollTo(0, 0);
     toggleHostBackButton(true);
     renderDetail();
+    revealDestination();
     animateScreen(el.detail, 'screen--push');
 
     // Отдельная запись в истории: без неё системный свайп «назад»

@@ -14,15 +14,19 @@
 // Все лифты стоят в одном здании, поэтому адрес общий, а не свой у каждого.
 const ADDRESS = 'Корпус 7, Мельникайте 70';
 
+// Этажей в корпусе
+const FLOORS = 16;
+
 const ELEVATORS = [
+  // Корпус один и в нём 16 этажей, поэтому все лифты ходят на всю высоту.
   // cameraFloor — на каком этаже висит камера; подпись собирает фронтенд
-  // на нужном языке, поэтому в данных текста нет
-  { id: 1, number: 1, cameraFloor: 1, floors: 9,  capacity: 5 },
-  { id: 2, number: 2, cameraFloor: 5, floors: 9,  capacity: 5 },
-  { id: 3, number: 3, cameraFloor: 1, floors: 7,  capacity: 6 },
-  { id: 4, number: 4, cameraFloor: 1, floors: 5,  capacity: 4 },
-  { id: 5, number: 5, cameraFloor: 1, floors: 4,  capacity: 8 },
-  { id: 6, number: 6, cameraFloor: 1, floors: 12, capacity: 6 }
+  // на нужном языке, поэтому в данных текста нет.
+  { id: 1, number: 1, cameraFloor: 1, floors: FLOORS, capacity: 5 },
+  { id: 2, number: 2, cameraFloor: 5, floors: FLOORS, capacity: 5 },
+  { id: 3, number: 3, cameraFloor: 1, floors: FLOORS, capacity: 6 },
+  { id: 4, number: 4, cameraFloor: 1, floors: FLOORS, capacity: 4 },
+  { id: 5, number: 5, cameraFloor: 1, floors: FLOORS, capacity: 8 },
+  { id: 6, number: 6, cameraFloor: 1, floors: FLOORS, capacity: 6 }
 ];
 
 const TICK_MS = 3000; // данные обновляются раз в 3 секунды
@@ -129,6 +133,7 @@ function startSimulation() {
 
 module.exports = {
   ADDRESS,
+  FLOORS,
   TICK_MS,
   getElevators,
   startSimulation,
