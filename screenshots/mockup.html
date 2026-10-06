@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TIU GO — мокап для презентации</title>
+  <style>
+    /*
+      Готовый слайд 1920×1080 с тремя «айфонами».
+      Открывается руками в браузере и снимается автоматически:
+        npm run screenshots  →  mockup.png и mockup-dark.png
+
+      Параметры в адресе:
+        ?theme=dark          — тёмный вариант слайда
+        ?bare=main-dark      — один телефон без фона (для наложения на слайд)
+    */
+
+    :root {
+      --bg-1: #F4F6FA;
+      --bg-2: #E7EAF1;
+      --glow: rgba(79, 70, 229, 0.1);
+      --title: #0B0D12;
+      --muted: #6B7280;
+      --frame: #1A1C22;
+      --frame-edge: #3A3D46;
+      --shadow: rgba(11, 13, 18, 0.28);
+    }
+
+    html[data-theme='dark'] {
+      --bg-1: #0B0D12;
+      --bg-2: #141821;
+      --glow: rgba(91, 141, 239, 0.16);
+      --title: #FFFFFF;
+      --muted: #9CA3AF;
+      --frame: #0E1015;
+      --frame-edge: #2A2E38;
+      --shadow: rgba(0, 0, 0, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+                   system-ui, 'Segoe UI', Roboto, sans-serif;
+      color: var(--title);
+      background: var(--bg-2);
+    }
+
+    /* ── Полотно слайда ─────────────────────────────────── */
+    .slide {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      margin: 0 auto;
+      padding: 72px 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 52px;
+      overflow: hidden;
+      background:
+        radial-gradient(1200px 700px at 50% -10%, var(--glow), transparent 70%),
+        linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    }
+
+    .head { text-align: center; }
+
+    .head h1 {
+      margin: 0;
+      font-size: 58px;
+      font-weight: 700;
+      letter-spacing: -2px;
+    }
+
+    .head p {
+      margin: 14px 0 0;
+      font-size: 24px;
+      color: var(--muted);
+      letter-spacing: -0.3px;
+    }
+
+    .devices {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 72px;
+    }
+
+    .device {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .device__label {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: -0.3px;
+    }
+
+    /* ── Корпус iPhone 14 ───────────────────────────────────
+       Все размеры считаются от --s, поэтому один и тот же
+       блок легко масштабируется под слайд и под отдельный кадр. */
+    .phone {
+      --s: 0.74;
+
+      position: relative;
+      flex: 0 0 auto;
+      width: calc(414px * var(--s));
+      height: calc(868px * var(--s));
+      padding: calc(12px * var(--s));
+      border-radius: calc(56px * var(--s));
+      background: var(--frame);
+      box-shadow:
+        0 0 0 calc(2px * var(--s)) var(--frame-edge),
+        0 calc(40px * var(--s)) calc(80px * var(--s)) var(--shadow),
+        0 calc(10px * var(--s)) calc(24px * var(--s)) rgba(0, 0, 0, 0.18);
+    }
+
+    .phone__screen {
+      position: relative;
+      width: calc(390px * var(--s));
+      height: calc(844px * var(--s));
+      border-radius: calc(44px * var(--s));
+      overflow: hidden;
+      background: #000;
+    }
+
+    .phone__screen img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Чёлка / Dynamic Island */
+    .phone__notch {
+      position: absolute;
+      top: calc(11px * var(--s));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(124px * var(--s));
+      height: calc(35px * var(--s));
+      border-radius: 999px;
+      background: #000;
+      z-index: 2;
+    }
+
+    /* Строка состояния: рисуем её в рамке, а не в самом приложении */
+    .phone__status {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: calc(47px * var(--s));
+      padding: 0 calc(30px * var(--s)) 0 calc(34px * var(--s));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: calc(15px * var(--s));
+      font-weight: 600;
+      letter-spacing: calc(-0.2px * var(--s));
+      color: #FFFFFF;
+      z-index: 3;
+    }
+
+    .phone__status[data-tone='light'] { color: #0B0D12; }
+
+    .phone__icons {
+      display: flex;
+      align-items: center;
+      gap: calc(6px * var(--s));
+    }
+
+    .phone__icons svg {
+      display: block;
+      height: calc(12px * var(--s));
+      width: auto;
+      fill: currentColor;
+    }
+
+    /* Полоска «домой» */
+    .phone__home {
+      position: absolute;
+      bottom: calc(9px * var(--s));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(140px * var(--s));
+      height: calc(5px * var(--s));
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.85);
+      z-index: 3;
+    }
+
+    .phone__home[data-tone='light'] { background: rgba(11, 13, 18, 0.65); }
+
+    /* Боковые кнопки */
+    .phone__btn {
+      position: absolute;
+      width: calc(3px * var(--s));
+      background: var(--frame-edge);
+      border-radius: calc(2px * var(--s));
+    }
+
+    .phone__btn--power { right: calc(-3px * var(--s)); top: calc(220px * var(--s)); height: calc(92px * var(--s)); }
+    .phone__btn--up    { left:  calc(-3px * var(--s)); top: calc(168px * var(--s)); height: calc(56px * var(--s)); }
+    .phone__btn--down  { left:  calc(-3px * var(--s)); top: calc(236px * var(--s)); height: calc(56px * var(--s)); }
+    .phone__btn--mute  { left:  calc(-3px * var(--s)); top: calc(112px * var(--s)); height: calc(32px * var(--s)); }
+
+    /* ── Режим одиночного телефона без фона ─────────────── */
+    html.bare, html.bare body { background: transparent; }
+
+    html.bare .slide {
+      width: auto;
+      height: auto;
+      padding: 0;
+      gap: 0;
+      background: none;
+    }
+
+    html.bare .head,
+    html.bare .device__label { display: none; }
+
+    /* Тень убираем: при вырезании кадра она всё равно обрежется */
+    html.bare .phone {
+      --s: 1;
+      box-shadow: 0 0 0 2px var(--frame-edge);
+    }
+
+    /* Просмотр на обычном мониторе: ужимаем слайд целиком */
+    @media (max-width: 1960px) {
+      body { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slide">
+    <div class="head">
+      <h1>TIU GO</h1>
+      <p>Мониторинг лифтов ТИУ — мини-приложение для Telegram и MAX</p>
+    </div>
+
+    <div class="devices" id="devices">
+      <!-- телефоны расставляет скрипт ниже -->
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // Какие кадры показываем на слайде и как их подписываем
+      var SHOTS = [
+        { file: 'main-dark.png',   label: 'Главный экран', tone: 'dark' },
+        { file: 'detail-dark.png', label: 'Экран лифта',   tone: 'dark' },
+        { file: 'main-light.png',  label: 'Светлая тема',  tone: 'light' }
+      ];
+
+      // Иконки строки состояния: связь, Wi-Fi, батарея
+      var STATUS_ICONS =
+        '<svg viewBox="0 0 18 12" aria-hidden="true">' +
+          '<rect x="0" y="8"  width="3" height="4"  rx="1"/>' +
+          '<rect x="5" y="5.5" width="3" height="6.5" rx="1"/>' +
+          '<rect x="10" y="3" width="3" height="9"  rx="1"/>' +
+          '<rect x="15" y="0" width="3" height="12" rx="1"/>' +
+        '</svg>' +
+        '<svg viewBox="0 0 16 12" aria-hidden="true">' +
+          '<path d="M8 11.2 5.9 8.9a3 3 0 0 1 4.2 0L8 11.2Z"/>' +
+          '<path d="M8 6.6a5.4 5.4 0 0 0-3.9 1.6L2.7 6.8a7.5 7.5 0 0 1 10.6 0l-1.4 1.4A5.4 5.4 0 0 0 8 6.6Z"/>' +
+          '<path d="M8 2.3a9.7 9.7 0 0 0-6.9 2.8L0 3.7a11.7 11.7 0 0 1 16 0l-1.1 1.4A9.7 9.7 0 0 0 8 2.3Z"/>' +
+        '</svg>' +
+        '<svg viewBox="0 0 26 12" aria-hidden="true">' +
+          '<rect x="0.5" y="0.5" width="22" height="11" rx="3.2" fill="none" ' +
+            'stroke="currentColor" stroke-opacity="0.4"/>' +
+          '<rect x="2" y="2" width="16" height="8" rx="2"/>' +
+          '<path d="M24 4.2v3.6a2 2 0 0 0 0-3.6Z" opacity="0.5"/>' +
+        '</svg>';
+
+      var params = new URLSearchParams(location.search);
+
+      // Тема слайда: ?theme=dark
+      if (params.get('theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+
+      // Одиночный телефон без фона: ?bare=main-dark
+      var bare = params.get('bare');
+      if (bare) {
+        document.documentElement.classList.add('bare');
+        SHOTS = [{
+          file: bare + '.png',
+          label: '',
+          tone: bare.indexOf('light') > -1 ? 'light' : 'dark'
+        }];
+      }
+
+      function phoneHtml(shot) {
+        return '' +
+          '<div class="device">' +
+            '<div class="phone">' +
+              '<div class="phone__btn phone__btn--mute"></div>' +
+              '<div class="phone__btn phone__btn--up"></div>' +
+              '<div class="phone__btn phone__btn--down"></div>' +
+              '<div class="phone__btn phone__btn--power"></div>' +
+              '<div class="phone__screen">' +
+                '<div class="phone__notch"></div>' +
+                '<div class="phone__status" data-tone="' + shot.tone + '">' +
+                  '<span>9:41</span>' +
+                  '<span class="phone__icons">' + STATUS_ICONS + '</span>' +
+                '</div>' +
+                '<img src="' + shot.file + '" alt="' + shot.label + '" />' +
+                '<div class="phone__home" data-tone="' + shot.tone + '"></div>' +
+              '</div>' +
+            '</div>' +
+            (shot.label ? '<span class="device__label">' + shot.label + '</span>' : '') +
+          '</div>';
+      }
+
+      document.getElementById('devices').innerHTML = SHOTS.map(phoneHtml).join('');
+    })();
+  </script>
+
+</body>
+</html>

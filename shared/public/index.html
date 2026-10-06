@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" id="theme-color" content="#0B0D12" />
+
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+  <title>TIU GO</title>
+
+  <!--
+    Тему ставим до первой отрисовки, иначе при светлой теме мелькнёт тёмный фон.
+    Порядок: сохранённый выбор пользователя → системная настройка → тёмная.
+  -->
+  <script>
+    (function () {
+      var theme = 'dark';
+      try {
+        var saved = window.localStorage.getItem('tiu-go-theme');
+        if (saved === 'light' || saved === 'dark') {
+          theme = saved;
+        } else if (window.matchMedia &&
+                   window.matchMedia('(prefers-color-scheme: light)').matches) {
+          theme = 'light';
+        }
+      } catch (e) { /* localStorage недоступен — остаёмся на тёмной */ }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <!-- SDK Telegram Mini Apps. В MAX скрипт не загрузится — приложение это переживёт. -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Плашка офлайна: показывается, когда рисуем данные из кэша -->
+  <div class="offline" id="offline" hidden>
+    <span class="offline__icon" aria-hidden="true">📡</span>
+    <span id="offline-text"></span>
+  </div>
+
+  <!-- ══ Главный экран ══════════════════════════════════ -->
+  <section class="screen" id="screen-home">
+
+    <!-- Компактный навбар: проявляется при прокрутке, карточки идут под ним -->
+    <div class="topbar glass" id="topbar" aria-hidden="true">
+      <div class="topbar__inner">
+        <span class="topbar__title" data-i18n="home.title">Лифты</span>
+      </div>
+    </div>
+
+    <header class="hero">
+      <p class="hero__brand">TIU GO</p>
+      <div class="hero__row">
+        <h1 class="hero__title" data-i18n="home.title">Лифты</h1>
+
+        <div class="hero__tools">
+          <!-- Общий статус системы: сколько лифтов свободно. Тап — наверх списка -->
+          <button class="sysbtn is-loading" id="sys-status" type="button"
+                  data-tone="ok" data-i18n-aria="a11y.sys">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+              <path d="M12 3v18"/>
+              <path d="M8.2 9.4 9.9 7.5l1.7 1.9"/>
+              <path d="M12.4 14.6l1.7 1.9 1.7-1.9"/>
+            </svg>
+            <span id="sys-free">—</span>
+          </button>
+
+          <span class="live" id="dot"></span>
+
+          <!-- Язык интерфейса -->
+          <button class="chipbtn" id="lang-toggle" type="button" data-i18n-aria="a11y.lang">
+            <span id="lang-label">RU</span>
+          </button>
+
+          <button class="theme-toggle" id="theme-toggle" type="button"
+                  data-i18n-aria="a11y.theme">
+            <span id="theme-icon">🌙</span>
+          </button>
+        </div>
+      </div>
+      <p class="hero__sub" data-i18n="home.subtitle">Тюменский индустриальный университет</p>
+      <p class="hero__summary" id="summary" data-i18n="home.loading">Загружаем данные…</p>
+
+      <!-- Пиковые часы: показывается только во время пика или перед ним -->
+      <div class="peak" id="peak" hidden>
+        <span class="peak__icon" id="peak-icon">⚡</span>
+        <span id="peak-text"></span>
+      </div>
+    </header>
+
+    <!-- Заглушки на время первой загрузки -->
+    <div class="grid" id="skeleton" hidden>
+      <span class="skeleton"></span><span class="skeleton"></span>
+      <span class="skeleton"></span><span class="skeleton"></span>
+      <span class="skeleton"></span><span class="skeleton"></span>
+    </div>
+
+    <!-- Сетка карточек лифтов, две колонки -->
+    <div class="grid" id="grid"></div>
+
+    <!-- Пустой экран: данных нет и кэша тоже -->
+    <div class="empty" id="empty" hidden>
+      <svg class="empty__art" viewBox="0 0 120 120" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="22" y="12" width="76" height="96" rx="8"/>
+        <path d="M60 20v80"/>
+        <path d="M34 20v80M86 20v80" opacity="0.35"/>
+        <path d="M44 46l8-9 8 9" opacity="0.8"/>
+        <path d="M60 74l8 9 8-9" opacity="0.8"/>
+        <path d="M30 6h60" opacity="0.35"/>
+      </svg>
+
+      <h2 class="empty__title" id="empty-title" data-i18n="empty.title">Данные недоступны</h2>
+      <p class="empty__text" id="empty-text" data-i18n="empty.subtitle">
+        Не удалось связаться с сервером. Проверь соединение.
+      </p>
+
+      <button class="button button--accent" id="empty-retry" type="button">
+        <span class="empty__retry-icon" aria-hidden="true">↻</span>
+        <span id="empty-retry-text" data-i18n="empty.retry">Повторить</span>
+      </button>
+    </div>
+
+    <footer class="foot">
+      <span id="updated" data-i18n="foot.refresh">обновление каждые 3 секунды</span>
+      <span data-i18n="foot.note">Данные тестовые. Камеры подключим позже.</span>
+    </footer>
+  </section>
+
+  <!-- ══ Экран детали лифта ═════════════════════════════ -->
+  <section class="screen" id="screen-detail" hidden>
+
+    <!-- Навигационная панель в стиле iOS: полупрозрачная, с размытием -->
+    <header class="navbar glass">
+      <button class="navbar__back" id="back" type="button">
+        <span class="navbar__chevron" aria-hidden="true"></span>
+        <span data-i18n="detail.back">Назад</span>
+      </button>
+      <div class="navbar__titles">
+        <span class="navbar__title" id="detail-title">Лифт</span>
+        <span class="navbar__subtitle" id="detail-subtitle">—</span>
+      </div>
+      <span class="navbar__spacer" aria-hidden="true"></span>
+    </header>
+
+    <div class="content">
+
+      <!-- Этаж назначения: от него считается сравнение с лестницей -->
+      <section class="card">
+        <span class="metric__label" data-i18n="detail.destination">Куда едешь?</span>
+        <div class="floors" id="destination"><!-- кнопки строит app.js --></div>
+      </section>
+
+      <!-- Онлайн-камера зоны ожидания -->
+      <section class="card card--camera">
+        <div class="card__head">
+          <h2 class="card__title" data-i18n="detail.camera">Онлайн-камера</h2>
+        </div>
+
+        <div class="camera">
+          <div class="camera__scene" id="camera-scene"><!-- кадр рисует app.js --></div>
+
+          <!-- Элементы поверх кадра — на матовой подложке, как в плеере iOS -->
+          <span class="live-tag glass glass--over-media"><i></i>LIVE</span>
+          <span class="camera__badge glass glass--over-media" id="camera-badge">—</span>
+        </div>
+
+        <p class="card__caption" id="camera-caption">—</p>
+      </section>
+
+      <!-- Статистика -->
+      <div class="stats">
+        <article class="card metric" id="d-occupancy-card">
+          <span class="metric__label" data-i18n="detail.inCabin">В кабине</span>
+          <b class="metric__value" id="d-occupancy">0 / 0</b>
+          <span class="bar"><i id="d-bar" style="width:0%"></i></span>
+        </article>
+
+        <article class="card metric">
+          <span class="metric__label" data-i18n="detail.waiting">Ожидают</span>
+          <b class="metric__value" id="d-waiting">0</b>
+        </article>
+
+        <article class="card metric">
+          <span class="metric__label" data-i18n="detail.wait">Ожидание</span>
+          <span class="metric__line">
+            <b class="metric__value" id="d-wait">0</b>
+            <span class="metric__unit" id="d-wait-unit">секунд</span>
+          </span>
+        </article>
+
+        <!-- Текущий этаж: крупная шахта с плавно едущей кабиной -->
+        <article class="card metric metric--floor">
+          <div class="shaft shaft--lg" id="d-shaft">
+            <div class="shaft__ticks" id="d-ticks"></div>
+            <span class="shaft__cabin" id="d-cabin"></span>
+          </div>
+          <div class="metric__body">
+            <span class="metric__label" data-i18n="detail.currentFloor">Текущий этаж</span>
+            <b class="metric__value" id="d-floor">0</b>
+            <span class="metric__dir" id="d-direction">•</span>
+          </div>
+        </article>
+
+        <article class="card metric" id="d-rec-panel">
+          <span class="metric__label" data-i18n="detail.recommendation">Рекомендация</span>
+          <b class="metric__value metric__value--rec" id="d-rec">—</b>
+        </article>
+
+        <!-- Сколько займёт лифт и сколько — лестница -->
+        <article class="card compare">
+          <span class="metric__label" data-i18n="compare.title">Сравнение</span>
+
+          <div class="compare__row" id="cmp-elevator">
+            <span class="compare__name">
+              <span class="compare__emoji">🛗</span>
+              <span data-i18n="compare.elevator">Лифт</span>
+            </span>
+            <b class="compare__time" id="cmp-elevator-time">—</b>
+          </div>
+
+          <div class="compare__row" id="cmp-stairs">
+            <span class="compare__name">
+              <span class="compare__emoji">🚶</span>
+              <span data-i18n="compare.stairs">Лестница</span>
+            </span>
+            <b class="compare__time" id="cmp-stairs-time">—</b>
+          </div>
+
+          <p class="compare__verdict" id="cmp-verdict">—</p>
+        </article>
+      </div>
+
+      <!-- Жалоба на лифт -->
+      <button class="button button--outline" id="report-open" type="button">
+        <span aria-hidden="true">⚠</span>
+        <span data-i18n="report.button">Сообщить о проблеме</span>
+      </button>
+    </div>
+
+    <!-- Тулбар прижат к низу: контент прокручивается под стеклом -->
+    <div class="toolbar glass">
+      <div class="toolbar__inner">
+        <button class="button" id="refresh" type="button" data-i18n="detail.refresh">Обновить</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Модалка «сообщить о проблеме» ══════════════════ -->
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+
+  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
+       aria-labelledby="sheet-title">
+    <div class="sheet__grabber" aria-hidden="true"></div>
+
+    <h2 class="sheet__title" id="sheet-title" data-i18n="report.title">Что случилось?</h2>
+
+    <div class="sheet__options" id="report-reasons"><!-- строит app.js --></div>
+
+    <label class="sheet__label" for="report-comment" data-i18n="report.comment">
+      Комментарий (необязательно)
+    </label>
+    <textarea class="sheet__textarea" id="report-comment" rows="3" maxlength="500"></textarea>
+
+    <div class="sheet__actions">
+      <button class="button button--ghost" id="report-cancel" type="button"
+              data-i18n="report.cancel">Отмена</button>
+      <button class="button button--accent" id="report-submit" type="button"
+              data-i18n="report.submit">Отправить</button>
+    </div>
+  </div>
+
+  <!-- Тост после отправки -->
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

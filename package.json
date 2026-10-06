@@ -1,0 +1,35 @@
+{
+  "name": "tiu-go",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TIU GO — мини-приложение для мониторинга лифтов (Telegram + MAX)",
+  "main": "shared/server.js",
+  "scripts": {
+    "start": "node shared/server.js",
+    "start:server": "node shared/server.js",
+    "start:telegram": "node \"tiu go tg/index.js\"",
+    "start:max": "node \"tiu go max/index.js\"",
+    "screenshots": "node screenshots/capture.js",
+    "mockup": "node screenshots/capture.js --mockup-only"
+  },
+  "keywords": [
+    "tiu-go",
+    "elevator",
+    "telegram",
+    "max",
+    "miniapp"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "puppeteer": "^23.6.0"
+  }
+}

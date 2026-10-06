@@ -1,0 +1,20 @@
+[
+  {
+    "timestamp": "2026-10-06T03:17:06.311Z",
+    "elevatorId": 3,
+    "reason": "noise",
+    "comment": "Скрипит на 4 этаже"
+  },
+  {
+    "timestamp": "2026-10-06T03:26:07.385Z",
+    "elevatorId": 1,
+    "reason": "noise",
+    "comment": "Squeaks between floors 3 and 4"
+  },
+  {
+    "timestamp": "2026-10-06T03:35:09.748Z",
+    "elevatorId": 4,
+    "reason": "slow",
+    "comment": ""
+  }
+]

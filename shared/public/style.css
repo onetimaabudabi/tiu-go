@@ -1,0 +1,1293 @@
+/* ==========================================================================
+   TIU GO — тёмная и светлая темы.
+   Все цвета живут только в переменных: --color-* и --label-*.
+   Тёмная тема — значения по умолчанию в :root,
+   светлая — переопределение в :root[data-theme='light'].
+   ========================================================================== */
+
+:root {
+  /* ── Тёмная тема (по умолчанию) ── */
+  --color-bg: #0B0D12;
+  --color-card: #161A22;
+  --color-line: #232833;
+
+  --label: #FFFFFF;
+  --label-2: #9CA3AF;
+  --label-3: #6B7280;
+
+  --color-accent: #5B8DEF;
+  --color-ok: #22C55E;
+  --color-busy: #F59E0B;
+  --color-full: #EF4444;
+
+  /* Производные от палитры */
+  --color-fill: rgba(255, 255, 255, 0.07);
+  --tint-ok: rgba(34, 197, 94, 0.14);
+  --tint-busy: rgba(245, 158, 11, 0.14);
+  --tint-full: rgba(239, 68, 68, 0.12);
+  --tint-accent: rgba(91, 141, 239, 0.14);
+  --stroke-full: rgba(239, 68, 68, 0.5);
+
+  --shaft-tick: rgba(255, 255, 255, 0.12);
+
+  /* Пустая, но валидная тень: в тёмной теме карточки её не отбрасывают.
+     Писать здесь none нельзя — список вида «inset …, none» браузер
+     отвергает целиком, и вместе с ним пропадают рамки статуса и избранного. */
+  --card-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+
+  /* Плашка пиковых часов */
+  --peak-bg: #3A2E15;
+  --peak-fg: #F59E0B;
+  --peak-soon-bg: rgba(255, 255, 255, 0.07);
+  --peak-soon-fg: #9CA3AF;
+
+  /* Избранное */
+  --fav-border: rgba(91, 141, 239, 0.45);
+
+  /* Плашка офлайна и подложка модалки */
+  --offline-bg: #3A2E15;
+  --offline-fg: #F59E0B;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --skeleton: rgba(255, 255, 255, 0.06);
+
+  /* Материал «матовое стекло» для панелей поверх контента */
+  --glass: rgba(11, 13, 18, 0.72);
+  --glass-media: rgba(11, 13, 18, 0.45);
+
+  /* Геометрия */
+  --r-card: 20px;
+  --r-inner: 14px;
+  --r-control: 12px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --theme-shift: 0.3s ease; /* плавная смена темы */
+}
+
+:root[data-theme='light'] {
+  --color-bg: #F7F8FA;
+  --color-card: #FFFFFF;
+  --color-line: #E5E7EB;
+
+  --label: #0B0D12;
+  --label-2: #6B7280;
+  --label-3: #9CA3AF;
+
+  --color-accent: #4F46E5;
+  --color-ok: #22C55E;
+  --color-busy: #F59E0B;
+  --color-full: #EF4444;
+
+  --color-fill: rgba(11, 13, 18, 0.05);
+  --tint-ok: rgba(34, 197, 94, 0.12);
+  --tint-busy: rgba(245, 158, 11, 0.14);
+  --tint-full: rgba(239, 68, 68, 0.08);
+  --tint-accent: rgba(79, 70, 229, 0.1);
+  --stroke-full: rgba(239, 68, 68, 0.45);
+
+  --shaft-tick: rgba(11, 13, 18, 0.1);
+  --card-shadow: 0 1px 2px rgba(11, 13, 18, 0.05);
+
+  --peak-bg: #FEF3C7;
+  --peak-fg: #B45309;
+  --peak-soon-bg: rgba(11, 13, 18, 0.05);
+  --peak-soon-fg: #6B7280;
+
+  --fav-border: rgba(79, 70, 229, 0.35);
+
+  --offline-bg: #FEF3C7;
+  --offline-fg: #B45309;
+  --backdrop: rgba(11, 13, 18, 0.35);
+  --skeleton: rgba(11, 13, 18, 0.05);
+
+  --glass: rgba(247, 248, 250, 0.72);
+  --glass-media: rgba(11, 13, 18, 0.45);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* Атрибут hidden должен побеждать любые display из классов.
+   Без этого, например, .grid { display: grid } перебивает скрытие
+   и заглушки остаются на экране поверх настоящих карточек. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
+body {
+  /* Системный шрифт: SF Pro на технике Apple, шрифт платформы на остальных */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+               system-ui, 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--label);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+
+/* ── Матовое стекло ─────────────────────────────────────────
+   Только на панелях, под которыми что-то проезжает: навбары,
+   нижний тулбар, плашки и элементы поверх кадра камеры. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  transition: background-color var(--theme-shift), border-color var(--theme-shift);
+}
+
+/* Вариант поверх изображения: подложка всегда тёмная, без оглядки на тему */
+.glass--over-media {
+  background: var(--glass-media);
+  -webkit-backdrop-filter: saturate(150%) blur(14px);
+  backdrop-filter: saturate(150%) blur(14px);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+}
+
+/* Там, где размытие не поддерживается, панели просто становятся плотными */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .topbar, .navbar, .toolbar { background: var(--color-bg); }
+  .glass--over-media { background: var(--color-bg); }
+}
+
+/* ── Экраны и переходы ──────────────────────────────────── */
+.screen { max-width: 600px; margin: 0 auto; }
+.screen[hidden] { display: none; }
+
+.screen--push { animation: push 0.35s var(--ease) both; }
+.screen--pop  { animation: pop 0.35s var(--ease) both; }
+
+@keyframes push {
+  from { opacity: 0; transform: translate3d(18px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translate3d(-14px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Плашка офлайна: рисуем данные из кэша ──────────────── */
+.offline {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  border-radius: var(--r-control);
+  background: var(--offline-bg);
+  color: var(--offline-fg);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.offline[hidden] { display: none; }
+
+.offline__icon { font-size: 13px; line-height: 1; }
+
+/* ── Компактный навбар списка: появляется при прокрутке ──── */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 25;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 0.5px solid transparent;
+  opacity: 0;
+  transform: translate3d(0, -6px, 0);
+  pointer-events: none;
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease),
+              border-color 0.28s var(--ease), top 0.28s var(--ease),
+              background-color var(--theme-shift);
+}
+
+/* Сдвиг под плашку офлайна, чтобы панели не накладывались */
+body.is-offline .topbar { top: var(--offline-h, 0px); }
+
+.topbar.is-visible {
+  opacity: 1;
+  transform: none;
+  border-bottom-color: var(--color-line);
+}
+
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.topbar__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+/* ── Крупный заголовок главного экрана ──────────────────── */
+.hero { padding: calc(22px + env(safe-area-inset-top)) 16px 4px; }
+
+.hero__brand {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--label-2);
+}
+
+.hero__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero__title {
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+
+.hero__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.hero__sub {
+  margin-top: 3px;
+  font-size: 15px;
+  color: var(--label-2);
+  letter-spacing: -0.2px;
+}
+
+.hero__summary {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* Индикатор обновления данных */
+.live {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-ok);
+  transition: background-color 0.25s ease, opacity 0.25s ease;
+}
+
+.live.is-off { background: var(--color-full); }
+.live.is-blink { opacity: 0.3; }
+
+/* ── Общий статус системы в шапке ───────────────────────── */
+.sysbtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: opacity 0.3s ease, color 0.3s ease, transform 0.2s var(--ease),
+              background-color var(--theme-shift), border-color var(--theme-shift);
+}
+
+.sysbtn:active { transform: scale(0.93); }
+
+/* Пока данные не пришли — приглушаем */
+.sysbtn.is-loading { opacity: 0.5; }
+
+.sysbtn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+
+/* Цвет берётся из общей ситуации по всем лифтам */
+.sysbtn[data-tone='ok']   { color: var(--color-ok); }
+.sysbtn[data-tone='busy'] { color: var(--color-busy); }
+.sysbtn[data-tone='full'] { color: var(--color-full); }
+
+/* ── Компактная кнопка (язык) ───────────────────────────── */
+.chipbtn {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--label-2);
+  cursor: pointer;
+  transition: background-color var(--theme-shift), border-color var(--theme-shift),
+              color 0.25s ease, transform 0.2s var(--ease);
+}
+
+.chipbtn:active { transform: scale(0.92); }
+
+/* ── Тумблер темы ───────────────────────────────────────── */
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-card);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--theme-shift), border-color var(--theme-shift),
+              color var(--theme-shift), transform 0.2s var(--ease);
+}
+
+.theme-toggle:active { transform: scale(0.9); }
+
+/* ── Плашка пиковых часов ───────────────────────────────── */
+.peak {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 10px 13px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.05px;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.peak[hidden] { display: none; }
+
+.peak__icon { font-size: 14px; line-height: 1; flex: 0 0 auto; }
+
+/* Пик идёт прямо сейчас — спокойный янтарный */
+.peak--now { background: var(--peak-bg); color: var(--peak-fg); }
+
+/* Пик вот-вот начнётся — нейтральный серый */
+.peak--soon { background: var(--peak-soon-bg); color: var(--peak-soon-fg); }
+
+/* ── Сетка карточек ─────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 16px 0;
+}
+
+/* ── Карточка лифта ─────────────────────────────────────── */
+.tile {
+  --status: var(--label-2);
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--r-card);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease),
+              background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.tile:active { transform: scale(0.97); }
+
+.tile[data-status='ok']   { --status: var(--color-ok); }
+.tile[data-status='busy'] { --status: var(--color-busy); }
+.tile[data-status='full'] { --status: var(--color-full); }
+
+/* Избранный лифт — мягкая акцентная рамка */
+.tile[data-fav='1'] {
+  box-shadow: inset 0 0 0 1px var(--fav-border), var(--card-shadow);
+}
+
+/* Переполненный лифт — тонкая красная обводка, без свечения */
+.tile[data-status='full'] {
+  box-shadow: inset 0 0 0 1.5px var(--stroke-full), var(--card-shadow);
+}
+
+/* Шапка карточки: название слева, звезда справа */
+.tile__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tile__titles { min-width: 0; }
+
+.tile__star {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -4px -4px 0 0;
+  color: var(--label-3);
+  cursor: pointer;
+  transition: color 0.25s var(--ease), transform 0.2s var(--ease);
+}
+
+.tile__star svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+
+.tile__star:active { transform: scale(0.85); }
+
+/* Избранный лифт: звезда закрашена акцентом */
+.tile__star.is-on { color: var(--color-accent); }
+.tile__star.is-on svg { fill: currentColor; }
+
+.tile__name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+}
+
+/* Адрес длинный, а колонка узкая — разрешаем перенос на вторую строку */
+.tile__loc {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* Этаж: шахта слева, крупная цифра справа */
+.tile__floor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+.tile__floor-num {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tile__floor-num b {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -1.6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__floor-num span {
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* ── Шахта лифта ────────────────────────────────────────── */
+.shaft {
+  --cab: 8px;
+
+  position: relative;
+  flex: 0 0 auto;
+  width: 6px;
+  height: 60px;
+  border-radius: 3px;
+  background: var(--color-line);
+  transition: background-color var(--theme-shift);
+}
+
+/* Крупный вариант на экране детали */
+.shaft--lg {
+  --cab: 16px;
+  width: 12px;
+  height: 200px;
+  border-radius: 6px;
+}
+
+/* Слой с рисками на экране детали — не влияет на раскладку */
+.shaft__ticks { position: absolute; inset: 0; }
+
+/* Риски этажей: выступают за края шахты, чтобы движение было заметнее */
+.shaft__tick {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 1px;
+  background: var(--shaft-tick);
+  transition: background-color var(--theme-shift);
+}
+
+.shaft--lg .shaft__tick { left: -5px; right: -5px; }
+
+/* Кабина: едет по шахте плавно, позицию задаёт app.js через bottom */
+.shaft__cabin {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--cab);
+  height: var(--cab);
+  margin-left: calc(var(--cab) / -2);
+  border-radius: 2.5px;
+  background: var(--color-accent);
+  transition: bottom 0.6s ease-in-out, background-color var(--theme-shift);
+}
+
+.shaft--lg .shaft__cabin { border-radius: 5px; }
+
+/* Стрелка направления движения */
+.dir {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--label-3);
+  transition: color 0.3s ease;
+}
+
+.dir.is-moving { color: var(--color-accent); }
+
+.tile__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.tile__row b {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--status);
+}
+
+/* Капсульная полоска заполненности */
+.bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-fill);
+  overflow: hidden;
+  transition: background-color var(--theme-shift);
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--status);
+  transition: width 0.45s var(--ease), background-color 0.25s ease;
+}
+
+.tile__wait {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 14px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.tile__wait-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tile__wait b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__wait svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--label-3);
+}
+
+/* Прогноз ожидания: часы + время */
+.tile__eta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 14px;
+  font-size: 12.5px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__eta svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--label-3);
+}
+
+/* Капсула-рекомендация */
+.pill {
+  display: inline-block;
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.pill--wait   { color: var(--color-ok); background: var(--tint-ok); }
+.pill--stairs { color: var(--color-busy); background: var(--tint-busy); }
+
+/* ── Подвал ─────────────────────────────────────────────── */
+.foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 12px;
+  color: var(--label-3);
+  letter-spacing: -0.05px;
+}
+
+/* ── Навигационная панель экрана детали ─────────────────── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  border-bottom: 0.5px solid var(--color-line);
+}
+
+.navbar__back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  cursor: pointer;
+  justify-self: start;
+  transition: opacity 0.2s ease, color var(--theme-shift);
+}
+
+.navbar__back:active { opacity: 0.4; }
+
+/* Шеврон «‹» рисуем сами — так он точнее совпадает с iOS */
+.navbar__chevron {
+  width: 9px;
+  height: 9px;
+  border-left: 2.2px solid currentColor;
+  border-bottom: 2.2px solid currentColor;
+  border-radius: 1px;
+  transform: rotate(45deg);
+  margin-right: 1px;
+}
+
+.navbar__titles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.navbar__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55vw;
+}
+
+.navbar__subtitle {
+  font-size: 11.5px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55vw;
+}
+
+.navbar__spacer { justify-self: end; }
+
+/* ── Контент экрана детали ──────────────────────────────── */
+.content {
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
+}
+
+.card {
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+  transition: background-color var(--theme-shift), box-shadow var(--theme-shift);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.card__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+}
+
+.card__caption {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--label-3);
+  letter-spacing: -0.05px;
+}
+
+.live-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.live-tag i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-full);
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes breathe { 50% { opacity: 0.25; } }
+
+/* ── Выбор этажа назначения ─────────────────────────────── */
+.floors {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.floors::-webkit-scrollbar { display: none; }
+
+.floor-pill {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 9px 0;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease),
+              border-color 0.25s var(--ease), transform 0.15s var(--ease);
+}
+
+.floor-pill:active { transform: scale(0.92); }
+
+/* Выбранный этаж — акцентная заливка */
+.floor-pill.is-active {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: #FFFFFF;
+}
+
+/* ── Кадр камеры ────────────────────────────────────────── */
+.camera {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-inner);
+  background: var(--color-line);
+  overflow: hidden;
+}
+
+.camera__scene, .camera__scene svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.camera__badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Карточки статистики ────────────────────────────────── */
+.stats { display: grid; gap: 12px; }
+
+.metric { --status: var(--label-2); }
+
+.metric[data-status='ok']   { --status: var(--color-ok); }
+.metric[data-status='busy'] { --status: var(--color-busy); }
+.metric[data-status='full'] { --status: var(--color-full); }
+
+.metric__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.metric__value {
+  display: block;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -1.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Крупная цифра «в кабине» окрашивается по статусу */
+.metric[data-status] .metric__value { color: var(--status); }
+
+.metric .bar { margin-top: 12px; height: 5px; }
+
+.metric__value--rec { font-size: 26px; letter-spacing: -0.8px; }
+.metric__value--rec.is-wait   { color: var(--color-ok); }
+.metric__value--rec.is-stairs { color: var(--color-busy); }
+
+/* Крупное значение с единицей измерения рядом */
+.metric__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.metric__unit {
+  font-size: 15px;
+  color: var(--label-2);
+  letter-spacing: -0.2px;
+}
+
+.metric__unit[hidden] { display: none; }
+
+/* ── Сравнение лифта с лестницей ────────────────────────── */
+.compare__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 15px;
+  color: var(--label-2);
+  border-bottom: 0.5px solid var(--color-line);
+  transition: color 0.3s ease, border-color var(--theme-shift);
+}
+
+.compare__name { display: flex; align-items: center; gap: 8px; }
+
+.compare__emoji { font-size: 15px; line-height: 1; }
+
+.compare__time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Вариант, который выигрывает по времени, подсвечивается */
+.compare__row.is-faster { color: var(--label); }
+#cmp-elevator.is-faster .compare__time { color: var(--color-accent); }
+#cmp-stairs.is-faster   .compare__time { color: var(--color-ok); }
+
+.compare__verdict {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--label-2);
+  transition: color 0.3s ease;
+}
+
+.compare__verdict.is-stairs   { color: var(--color-ok); }
+.compare__verdict.is-elevator { color: var(--color-accent); }
+
+/* Карточка текущего этажа: текст слева, шахта справа */
+.metric--floor {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.metric__body { min-width: 0; }
+
+.metric__dir {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--label-3);
+  transition: color 0.3s ease;
+}
+
+.metric__dir.is-moving { color: var(--color-accent); }
+
+/* ── Нижний тулбар с кнопкой ────────────────────────────── */
+.toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  border-top: 0.5px solid var(--color-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.toolbar__inner {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px 16px 12px;
+}
+
+/* ── Кнопка ─────────────────────────────────────────────── */
+.button {
+  width: 100%;
+  padding: 15px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: var(--tint-accent);
+  color: var(--color-accent);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s var(--ease),
+              background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.button:active { transform: scale(0.98); opacity: 0.7; }
+.button.is-busy { opacity: 0.45; pointer-events: none; }
+
+/* Сплошная акцентная — главное действие */
+.button--accent {
+  background: var(--color-accent);
+  color: #FFFFFF;
+}
+
+/* Контурная — второстепенное действие */
+.button--outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--label-2);
+  font-size: 15px;
+}
+
+/* Без фона — отмена */
+.button--ghost {
+  background: transparent;
+  color: var(--label-2);
+}
+
+/* ── Заглушки на время первой загрузки ──────────────────── */
+.skeleton {
+  display: block;
+  height: 232px;
+  border-radius: var(--r-card);
+  background: var(--skeleton);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ── Пустой экран ───────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px 32px;
+  animation: push 0.35s var(--ease) both;
+}
+
+.empty[hidden] { display: none; }
+
+.empty__art {
+  width: 120px;
+  height: 120px;
+  color: var(--label-3);
+  margin-bottom: 22px;
+}
+
+.empty__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.empty__text {
+  margin: 8px 0 24px;
+  max-width: 300px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.empty .button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-width: 180px;
+  padding: 13px 24px;
+  border-radius: 999px;
+}
+
+.empty__retry-icon { font-size: 16px; line-height: 1; }
+
+/* ── Модалка «сообщить о проблеме» ──────────────────────── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--backdrop);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.25s ease both;
+}
+
+.sheet-backdrop[hidden] { display: none; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--color-card);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.32s var(--ease) both;
+  transition: background-color var(--theme-shift);
+}
+
+.sheet[hidden] { display: none; }
+
+/* Закрытие: уезжает вниз */
+.sheet.is-closing { animation: slideDown 0.26s var(--ease) both; }
+.sheet-backdrop.is-closing { animation: fadeOut 0.26s ease both; }
+
+@keyframes slideUp   { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes slideDown { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fadeOut   { from { opacity: 1; } to { opacity: 0; } }
+
+.sheet__grabber {
+  width: 36px;
+  height: 5px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: var(--color-line);
+}
+
+.sheet__title {
+  margin-bottom: 14px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.sheet__options { display: grid; gap: 8px; }
+
+.sheet__option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--label);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+/* Выбранная причина */
+.sheet__option.is-active {
+  border-color: var(--color-accent);
+  background: var(--tint-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.sheet__label {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.sheet__textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  resize: none;
+  transition: border-color 0.2s var(--ease), background-color var(--theme-shift);
+}
+
+.sheet__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.sheet__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ── Тост ───────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  z-index: 50;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 13px 20px;
+  border-radius: 999px;
+  background: var(--color-card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), inset 0 0 0 1px var(--color-line);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  text-align: center;
+  animation: toastIn 0.3s var(--ease) both;
+}
+
+.toast[hidden] { display: none; }
+.toast.is-closing { animation: toastOut 0.3s var(--ease) both; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, 14px); }
+}
+
+/* ── Микроанимация цифр ─────────────────────────────────────
+   Класс вешается на момент смены значения: цифра чуть подпрыгивает. */
+.number-changed { animation: numberPop 0.4s ease-out; }
+
+/* Подскок делается через transform, а он не работает на строчных элементах */
+.tile__row b,
+.tile__wait b,
+.tile__eta b,
+.sysbtn span { display: inline-block; }
+
+@keyframes numberPop {
+  0%   { transform: translateY(5px); opacity: 0.45; }
+  60%  { transform: translateY(-1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Узкие экраны */
+@media (max-width: 340px) {
+  .hero__title { font-size: 30px; }
+  .tile__floor-num b { font-size: 34px; }
+  .metric__value { font-size: 30px; }
+  .shaft { height: 52px; }
+}
