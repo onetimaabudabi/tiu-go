@@ -35,11 +35,9 @@
      отвергает целиком, и вместе с ним пропадают рамки статуса и избранного. */
   --card-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
 
-  /* Плашка пиковых часов */
+  /* Янтарная плашка-предупреждение: «работают 4 из 6» и офлайн */
   --peak-bg: #3A2E15;
   --peak-fg: #F59E0B;
-  --peak-soon-bg: rgba(255, 255, 255, 0.07);
-  --peak-soon-fg: #9CA3AF;
 
   /* Избранное */
   --fav-border: rgba(91, 141, 239, 0.45);
@@ -89,8 +87,6 @@
 
   --peak-bg: #FEF3C7;
   --peak-fg: #B45309;
-  --peak-soon-bg: rgba(11, 13, 18, 0.05);
-  --peak-soon-fg: #6B7280;
 
   --fav-border: rgba(79, 70, 229, 0.35);
 
@@ -208,7 +204,7 @@ button { font: inherit; color: inherit; }
 
 .offline[hidden] { display: none; }
 
-.offline__icon { font-size: 13px; line-height: 1; }
+.offline .icon { width: 15px; height: 15px; }
 
 /* ── Компактный навбар списка: появляется при прокрутке ──── */
 .topbar {
@@ -336,7 +332,7 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 /* Пока данные не пришли — приглушаем */
 .sysbtn.is-loading { opacity: 0.5; }
 
-.sysbtn svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.sysbtn .icon { width: 20px; height: 20px; }
 
 /* Цвет берётся из общей ситуации по всем лифтам */
 .sysbtn[data-tone='ok']   { color: var(--color-ok); }
@@ -364,8 +360,8 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 
 .chipbtn:active { transform: scale(0.92); }
 
-/* ── Тумблер темы ───────────────────────────────────────── */
-.theme-toggle {
+/* ── Круглые кнопки-иконки в шапке: тема и уведомления ──── */
+.iconbtn {
   display: grid;
   place-items: center;
   width: 32px;
@@ -374,39 +370,20 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   border: 1px solid var(--color-line);
   border-radius: 50%;
   background: var(--color-card);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
+  color: var(--label-2);
   cursor: pointer;
   transition: background-color var(--theme-shift), border-color var(--theme-shift),
               color var(--theme-shift), transform 0.2s var(--ease);
 }
 
-.theme-toggle:active { transform: scale(0.9); }
+.iconbtn:active { transform: scale(0.9); }
 
-/* ── Плашка пиковых часов ───────────────────────────────── */
-.peak {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 14px;
-  padding: 10px 13px;
-  border-radius: var(--r-control);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.05px;
-  animation: push 0.3s var(--ease) both;
-  transition: background-color var(--theme-shift), color var(--theme-shift);
-}
+/* Подписка включена — колокольчик становится акцентным */
+.iconbtn.is-on { color: var(--color-accent); border-color: var(--fav-border); }
 
-.peak[hidden] { display: none; }
-
-.peak__icon { font-size: 14px; line-height: 1; flex: 0 0 auto; }
-
-/* Пик идёт прямо сейчас — спокойный янтарный */
-.peak--now { background: var(--peak-bg); color: var(--peak-fg); }
-
-/* Пик вот-вот начнётся — нейтральный серый */
-.peak--soon { background: var(--peak-soon-bg); color: var(--peak-soon-fg); }
+#theme-icon { display: grid; place-items: center; line-height: 1; }
 
 /* ── Сетка карточек ─────────────────────────────────────── */
 .grid {
@@ -450,18 +427,22 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   box-shadow: inset 0 0 0 1.5px var(--stroke-full), var(--card-shadow);
 }
 
-/* Шапка карточки: название слева, звезда справа */
+/* Шапка карточки: название слева, звезда справа, бейдж статуса рядом.
+   Перенос обязателен: карточка в две колонки узкая, и длинное слово
+   «Обслуживание» иначе сжимает название лифта до нулевой ширины. */
 .tile__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.tile__titles { min-width: 0; }
+.tile__titles { flex: 1 1 auto; min-width: 0; }
 
 .tile__star {
   flex: 0 0 auto;
+  order: 2;
   display: grid;
   place-items: center;
   width: 26px;
@@ -472,13 +453,12 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   transition: color 0.25s var(--ease), transform 0.2s var(--ease);
 }
 
-.tile__star svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.tile__star .icon { width: 17px; height: 17px; }
 
 .tile__star:active { transform: scale(0.85); }
 
 /* Избранный лифт: звезда закрашена акцентом */
 .tile__star.is-on { color: var(--color-accent); }
-.tile__star.is-on svg { fill: currentColor; }
 
 .tile__name {
   display: block;
@@ -579,11 +559,15 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 
 /* Стрелка направления движения */
 .dir {
-  font-size: 10px;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
   color: var(--label-3);
   transition: color 0.3s ease;
 }
+
+.dir .icon { width: 13px; height: 13px; }
 
 .dir.is-moving { color: var(--color-accent); }
 
@@ -811,15 +795,7 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   letter-spacing: 0.4px;
 }
 
-.live-tag i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-full);
-  animation: breathe 2.2s ease-in-out infinite;
-}
-
-@keyframes breathe { 50% { opacity: 0.25; } }
+.live-tag .icon { width: 11px; height: 11px; stroke-width: 2.2; }
 
 /* ── Выбор этажа назначения ─────────────────────────────── */
 /* Единственное место на экране с горизонтальной прокруткой */
@@ -970,7 +946,7 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   min-width: 0; /* иначе длинная подпись растянет строку наружу */
 }
 
-.compare__emoji { font-size: 15px; line-height: 1; }
+.compare__name .icon { width: 17px; height: 17px; color: var(--label-3); }
 
 .compare__time {
   font-weight: 600;
@@ -1004,9 +980,11 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 .metric__body { min-width: 0; }
 
 .metric__dir {
-  display: inline-block;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
   margin-top: 8px;
-  font-size: 13px;
   color: var(--label-3);
   transition: color 0.3s ease;
 }
@@ -1131,7 +1109,7 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   border-radius: 999px;
 }
 
-.empty__retry-icon { font-size: 16px; line-height: 1; }
+.empty .button .icon { width: 17px; height: 17px; }
 
 /* ── Модалка «сообщить о проблеме» ──────────────────────── */
 .sheet-backdrop {
@@ -1309,4 +1287,371 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   .tile__floor-num b { font-size: 34px; }
   .metric__value { font-size: 30px; }
   .shaft { height: 52px; }
+}
+
+/* ==========================================================================
+   SVG-иконки
+   Весь интерфейс рисуется спрайтом из icons.svg — эмодзи в разметке нет.
+   Иконка по умолчанию размером со строку текста (1em) и красится
+   currentColor, поэтому одна и та же картинка работает и серой подписью,
+   и красным статусом.
+   ========================================================================== */
+
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.15em;
+  flex: 0 0 auto;
+}
+
+.icon--ok      { color: var(--color-ok); }
+.icon--busy    { color: var(--color-busy); }
+.icon--full    { color: var(--color-full); }
+.icon--accent  { color: var(--color-accent); }
+.icon--muted   { color: var(--label-2); }
+
+.icon--large { width: 1.5em; height: 1.5em; }
+
+/* «Живая» иконка: онлайн-камера, индикатор связи */
+.icon--pulse { animation: pulse 2s infinite; }
+
+/* Кнопка обновления: оборот при нажатии */
+.icon--spin { animation: iconSpin 0.6s var(--ease); }
+
+@keyframes iconSpin { to { transform: rotate(360deg); } }
+
+/* Колокольчик качается, когда настройки уведомлений сохранены */
+.icon--swing { animation: iconSwing 0.7s ease; transform-origin: 50% 15%; }
+
+@keyframes iconSwing {
+  0%, 100% { transform: rotate(0); }
+  15%      { transform: rotate(14deg); }
+  35%      { transform: rotate(-11deg); }
+  55%      { transform: rotate(7deg); }
+  75%      { transform: rotate(-4deg); }
+}
+
+/* ==========================================================================
+   Статус работы лифта
+   Это не загруженность: сломанный лифт не «переполнен», он просто не везёт.
+   ========================================================================== */
+
+/* ── Сводка «Работают 4 из 6» под шапкой ────────────────── */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 10px 13px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.notice--warn { background: var(--peak-bg); color: var(--peak-fg); }
+.notice .icon { width: 16px; height: 16px; }
+
+/* ── Бейдж на карточке: рядом со звездой ────────────────── */
+.badge {
+  flex: 0 0 auto;
+  order: 3;
+  margin-left: auto; /* на своей строке прижимается к правому краю */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -2px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.05px;
+  white-space: nowrap;
+}
+
+.badge .icon { width: 12px; height: 12px; stroke-width: 2; }
+
+.badge[data-work='broken']      { background: var(--tint-full); color: var(--color-full); }
+.badge[data-work='maintenance'] { background: var(--tint-busy); color: var(--color-busy); }
+
+/* ── Карточка неработающего лифта ───────────────────────── */
+
+/* Сломанный уходит на второй план и перечёркнут: по нему решать нечего */
+.tile[data-work='broken'] { opacity: 0.5; }
+.tile[data-work='broken'] .tile__name { text-decoration: line-through; }
+
+/* Обслуживание — жёлтая обводка вместо красной рамки статуса */
+.tile[data-work='maintenance'] {
+  box-shadow: inset 0 0 0 1.5px var(--color-busy), var(--card-shadow);
+}
+
+/* Прочерк вместо значения: приглушён и заметно мельче самой цифры,
+   иначе тире кеглем в 38 пикселей читается как жирная черта. */
+.is-dash {
+  font-size: 0.7em;
+  color: var(--label-3) !important;
+  letter-spacing: 0;
+}
+
+/* Таблетка рекомендации у неработающего лифта */
+.pill--down { color: var(--label-3); background: var(--color-fill); }
+
+/* ── Плашка вместо камеры на экране детали ──────────────── */
+.card--down {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.card--down[data-work='broken']      { color: var(--color-full); }
+.card--down[data-work='maintenance'] { color: var(--color-busy); }
+
+.card--down .icon { width: 34px; height: 34px; stroke-width: 1.5; }
+
+.down__title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.down__note {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--label-2);
+}
+
+/* ==========================================================================
+   Прогноз диапазоном
+   ========================================================================== */
+
+/* Подпись с точкой уверенности в одной строке */
+.metric__label--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Точка уверенности: зелёная — прогноз надёжный, серая — грубый */
+.confidence {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--label-3);
+  transition: background-color 0.3s ease;
+}
+
+.confidence[data-level='high']   { background: var(--color-ok); }
+.confidence[data-level='medium'] { background: var(--color-busy); }
+.confidence[data-level='low']    { background: var(--label-3); }
+
+/* Диапазон «~25–40 сек» заметно длиннее одной цифры */
+.metric__value--range { font-size: 26px; letter-spacing: -0.7px; }
+
+/* Та же точка в углу карточки на главном экране */
+.tile__eta .confidence { width: 6px; height: 6px; }
+
+/* ==========================================================================
+   Плашка «мой этаж»
+   ========================================================================== */
+
+.floorbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 0;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  text-align: left;
+  cursor: pointer;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift),
+              transform 0.2s var(--ease);
+}
+
+.floorbar:active { transform: scale(0.985); }
+
+/* Текст и подпись в колонку, чтобы подпись не растягивала плашку */
+.floorbar__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* «Дольше всего у лифта 3» — мельче и приглушённее основной строки */
+.floorbar__hint {
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.75;
+  letter-spacing: 0;
+}
+
+.floorbar__hint[hidden] { display: none; }
+
+.floorbar[data-level='ok']   { background: var(--tint-ok); color: var(--color-ok); }
+.floorbar[data-level='busy'] { background: var(--tint-busy); color: var(--color-busy); }
+.floorbar[data-level='full'] { background: var(--tint-full); color: var(--color-full); }
+
+.floorbar .icon { width: 16px; height: 16px; }
+
+/* Стрелка «открыть» прижата к правому краю и приглушена */
+.floorbar__go { margin-left: auto; opacity: 0.6; }
+
+/* ==========================================================================
+   Настройки уведомлений
+   ========================================================================== */
+
+/* Длинная модалка прокручивается внутри себя, кнопки остаются видны */
+.sheet__scroll {
+  max-height: 58vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Переключатель ──────────────────────────────────────── */
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease);
+}
+
+.switch__text {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.switch__text .icon { width: 17px; height: 17px; color: var(--label-2); }
+
+/* Сам чекбокс не виден, но остаётся доступным с клавиатуры */
+.switch__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch__track {
+  flex: 0 0 auto;
+  position: relative;
+  width: 50px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--color-fill);
+  transition: background-color 0.25s var(--ease);
+}
+
+.switch__track i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s var(--ease);
+}
+
+.switch__input:checked ~ .switch__track { background: var(--color-accent); }
+.switch__input:checked ~ .switch__track i { transform: translateX(20px); }
+
+.switch__input:focus-visible ~ .switch__track {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Выключенные уведомления — типы и порог приглушаются */
+.sheet__scroll.is-muted .checks,
+.sheet__scroll.is-muted .slider,
+.sheet__scroll.is-muted #notif-floors { opacity: 0.4; pointer-events: none; }
+
+/* ── Чекбоксы типов ─────────────────────────────────────── */
+.checks { display: grid; gap: 8px; }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  font-size: 14.5px;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+.check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Квадратик с галочкой: саму галочку показываем только отмеченной */
+.check__box {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--color-line);
+  border-radius: 7px;
+  color: transparent;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+.check__box .icon { width: 14px; height: 14px; stroke-width: 2.6; }
+
+.check input:checked ~ .check__box {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #FFFFFF;
+}
+
+.check:has(input:checked) { border-color: var(--fav-border); }
+
+.check input:focus-visible ~ .check__box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Ползунок порога ────────────────────────────────────── */
+.slider__input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-accent);
 }

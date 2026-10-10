@@ -10,7 +10,32 @@
     "start:telegram": "node \"tiu go tg/index.js\"",
     "start:max": "node \"tiu go max/index.js\"",
     "screenshots": "node screenshots/capture.js",
-    "mockup": "node screenshots/capture.js --mockup-only"
+    "mockup": "node screenshots/capture.js --mockup-only",
+    "3d:dev": "vite 3d-sim",
+    "3d:build": "vite build 3d-sim",
+    "3d:preview": "vite preview 3d-sim",
+    "docs:charts": "node scripts/generate-charts.js",
+    "docs:word": "node scripts/generate-word.js",
+    "docs:excel": "node scripts/generate-excel.js",
+    "docs:all": "npm run docs:charts && npm run docs:word && npm run docs:excel",
+    "math:queue": "node math-model/01-queueing-model.js",
+    "math:sim": "node math-model/02-simulation.js",
+    "math:utility": "node math-model/03-utility-model.js",
+    "math:physics": "node math-model/04-elevator-physics.js",
+    "math:sensitivity": "node math-model/05-sensitivity.js",
+    "math:optimize": "node math-model/06-optimization.js",
+    "math:report": "node math-model/07-report.js",
+    "math:all": "npm run math:physics && npm run math:queue && npm run math:sim && npm run math:utility && npm run math:sensitivity && npm run math:optimize && npm run math:report",
+    "tech:camera": "node tech-model/01-camera-model.js",
+    "tech:errors": "node tech-model/02-detection-errors.js",
+    "tech:decision": "node tech-model/03-decision-logic.js",
+    "tech:physics": "node tech-model/04-elevator-physics.js",
+    "tech:effect": "node tech-model/05-effectiveness.js",
+    "tech:sim": "node tech-model/06-simulation.js",
+    "tech:optimize": "node tech-model/07-optimization.js",
+    "tech:report": "node tech-model/08-report.js",
+    "tech:excel": "node tech-model/09-excel.js",
+    "tech:all": "npm run tech:camera && npm run tech:errors && npm run tech:decision && npm run tech:physics && npm run tech:effect && npm run tech:sim && npm run tech:optimize && npm run tech:excel && npm run tech:report"
   },
   "keywords": [
     "tiu-go",
@@ -30,6 +55,13 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "puppeteer": "^23.6.0"
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
+    "docx": "^9.8.1",
+    "exceljs": "^4.4.0",
+    "mathjs": "^15.2.0",
+    "puppeteer": "^23.6.0",
+    "three": "^0.160.1",
+    "vite": "^5.4.21"
   }
 }

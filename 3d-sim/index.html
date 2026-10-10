@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIU GO — 3D-визуализация холла корпуса 7</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Загрузка FBX: прогресс-бар поверх сцены -->
+  <div id="loader" class="loader">
+    <div class="loader__box">
+      <div class="loader__title">TIU GO · 3D</div>
+      <div class="loader__sub" id="loader-sub">Готовим сцену…</div>
+      <div class="loader__bar"><div class="loader__fill" id="loader-fill"></div></div>
+      <div class="loader__note" id="loader-note">Модели людей весят около 85 МБ — первая загрузка дольше обычного.</div>
+    </div>
+  </div>
+
+  <!-- ---------- Управление ---------- -->
+  <section class="panel panel--left" id="panel-left">
+    <div class="panel__head">
+      <span class="panel__title">Управление</span>
+      <button class="panel__toggle" data-collapse="panel-left" type="button" aria-label="Свернуть">–</button>
+    </div>
+
+    <div class="panel__body">
+      <div class="row row--main">
+        <button class="btn btn--primary" id="btn-play" type="button">▶ Пуск</button>
+        <button class="btn" id="btn-reset" type="button">↺ Сброс</button>
+      </div>
+
+      <div class="group">
+        <div class="group__label">Скорость</div>
+        <div class="row" id="speed-row"></div>
+      </div>
+
+      <div class="group">
+        <div class="group__label">Сценарий</div>
+        <div class="row" id="scenario-row"></div>
+      </div>
+
+      <div class="group">
+        <div class="group__label">Камера</div>
+        <div class="row" id="camera-row"></div>
+        <div class="row" id="follow-row"></div>
+      </div>
+
+      <p class="hint" id="speed-hint" hidden>
+        На таком ускорении движение превращается в таймлапс: шаг человека
+        занимает меньше кадра. Для презентации удобнее 10×.
+      </p>
+    </div>
+  </section>
+
+  <!-- ---------- Статистика ---------- -->
+  <section class="panel panel--right" id="panel-right">
+    <div class="panel__head">
+      <span class="panel__title">Что происходит</span>
+      <button class="panel__toggle" data-collapse="panel-right" type="button" aria-label="Свернуть">–</button>
+    </div>
+
+    <div class="panel__body">
+      <div class="clock" id="stat-clock">08:00</div>
+      <div class="clock__sub" id="stat-phase">симуляция не запущена</div>
+
+      <dl class="stats" id="stats-list"></dl>
+
+      <div class="legend">
+        <div class="legend__row"><i class="dot dot--free"></i> свободно</div>
+        <div class="legend__row"><i class="dot dot--busy"></i> очередь</div>
+        <div class="legend__row"><i class="dot dot--full"></i> толпа</div>
+      </div>
+
+      <div class="fps" id="stat-fps">— FPS</div>
+    </div>
+  </section>
+
+  <!-- ---------- Графики ---------- -->
+  <section class="panel panel--bottom collapsed" id="panel-bottom">
+    <div class="panel__head">
+      <span class="panel__title">Графики</span>
+      <div class="panel__actions">
+        <button class="btn btn--small" id="btn-record" type="button">● Записать 60 сек</button>
+        <button class="panel__toggle" data-collapse="panel-bottom" type="button" aria-label="Развернуть">+</button>
+      </div>
+    </div>
+
+    <div class="panel__body panel__body--charts">
+      <div class="chart">
+        <div class="chart__title">Очередь в холле</div>
+        <canvas id="chart-queue"></canvas>
+      </div>
+      <div class="chart">
+        <div class="chart__title">Загрузка кабин</div>
+        <canvas id="chart-load"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

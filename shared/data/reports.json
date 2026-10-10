@@ -16,5 +16,17 @@
     "elevatorId": 4,
     "reason": "slow",
     "comment": ""
+  },
+  {
+    "timestamp": "2026-10-06T06:23:30.770Z",
+    "elevatorId": 1,
+    "reason": "broken",
+    "comment": "hbh"
+  },
+  {
+    "timestamp": "2026-10-07T16:01:50.601Z",
+    "elevatorId": 1,
+    "reason": "broken",
+    "comment": ""
   }
 ]

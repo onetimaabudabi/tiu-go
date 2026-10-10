@@ -96,7 +96,8 @@ async function captureApp(browser) {
       '.hero   { padding-top: 69px !important; }',
       '.navbar { padding-top: 57px !important; }',
       '.topbar { padding-top: 47px !important; }',
-      '.notice { margin-top: 57px !important; }',
+      // плашка офлайна прижата к самой кромке — её тоже опускаем под «остров»
+      '.offline { margin-top: 57px !important; }',
       // снизу оставляем место под системную полоску «домой»
       '.toolbar { padding-bottom: 26px !important; }',
       '.content { padding-bottom: 136px !important; }',

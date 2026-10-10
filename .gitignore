@@ -5,3 +5,18 @@ node_modules/
 .DS_Store
 screenshots/*.png
 certs/
+
+# Документы генерируются командой npm run docs:all
+docs/
+
+# Результаты математической модели пересчитываются командой npm run math:all
+math-model/output/
+
+# Подписки на уведомления содержат chatId пользователей — в репозиторий не попадают
+shared/data/subscriptions.json
+
+# Результаты технической модели пересчитываются командой npm run tech:all
+tech-model/output/
+
+# Сборка 3D-визуализации пересоздаётся командой npm run 3d:build
+3d-sim/dist/

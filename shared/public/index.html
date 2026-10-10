@@ -37,9 +37,293 @@
 </head>
 <body>
 
+  <!--
+    Спрайт иконок. Копия shared/public/icons.svg: инлайн нужен, чтобы
+    <use href="#icon-…"> работал без запроса и наследовал currentColor.
+    Правите иконку — правьте icons.svg и переносите изменение сюда.
+  -->
+  <div id="icon-sprite" aria-hidden="true" style="display:none">
+<svg xmlns="http://www.w3.org/2000/svg" id="tiu-icons"
+     fill="none" stroke="currentColor" stroke-width="1.75"
+     stroke-linecap="round" stroke-linejoin="round"
+     style="display:none" aria-hidden="true">
+
+  <!-- ── Статусы загруженности ─────────────────────────────
+       Отличаются «плотностью»: галочка → свободно, половина → занято,
+       плотное ядро → переполнено. Так читаются и без цвета. -->
+  <symbol id="icon-status-ok" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M8.4 12.3l2.4 2.4 4.8-4.9"/>
+  </symbol>
+
+  <symbol id="icon-status-busy" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M12 3.5v17"/>
+    <path d="M15.4 6.1v11.8M18.1 9.2v5.6"/>
+  </symbol>
+
+  <symbol id="icon-status-full" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <circle cx="12" cy="12" r="4"/>
+  </symbol>
+
+  <symbol id="icon-status-broken" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/>
+  </symbol>
+
+  <symbol id="icon-status-maintenance" viewBox="0 0 24 24">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-8 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-8l-3.7 3.9z"/>
+  </symbol>
+
+  <symbol id="icon-online" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3.2"/>
+    <path d="M6.6 17.4a7.7 7.7 0 0 1 0-10.8"/>
+    <path d="M17.4 6.6a7.7 7.7 0 0 1 0 10.8"/>
+  </symbol>
+
+  <!-- ── Лифты и этажи ──────────────────────────────────── -->
+  <symbol id="icon-elevator" viewBox="0 0 24 24">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+    <path d="M12 3v18"/>
+    <path d="M8.2 9.4 9.9 7.5l1.7 1.9"/>
+    <path d="M12.4 14.6l1.7 1.9 1.7-1.9"/>
+  </symbol>
+
+  <symbol id="icon-elevator-moving-up" viewBox="0 0 24 24">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+    <path d="M12 16.5V8"/>
+    <path d="M8.8 11.2 12 8l3.2 3.2"/>
+  </symbol>
+
+  <symbol id="icon-elevator-moving-down" viewBox="0 0 24 24">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+    <path d="M12 7.5V16"/>
+    <path d="M8.8 12.8 12 16l3.2-3.2"/>
+  </symbol>
+
+  <symbol id="icon-elevator-idle" viewBox="0 0 24 24">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+    <path d="M8.5 12h7"/>
+  </symbol>
+
+  <symbol id="icon-floor" viewBox="0 0 24 24">
+    <rect x="3.5" y="4" width="17" height="16" rx="2.5"/>
+    <path d="M3.5 9.3h17M3.5 14.7h17"/>
+  </symbol>
+
+  <!-- ── Люди ───────────────────────────────────────────── -->
+  <symbol id="icon-user" viewBox="0 0 24 24">
+    <circle cx="12" cy="8" r="3.4"/>
+    <path d="M5.5 20v-1.2A4.8 4.8 0 0 1 10.3 14h3.4a4.8 4.8 0 0 1 4.8 4.8V20"/>
+  </symbol>
+
+  <symbol id="icon-users" viewBox="0 0 24 24">
+    <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/>
+    <circle cx="10" cy="7.5" r="3"/>
+    <path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/>
+    <path d="M15.5 4.7a3 3 0 0 1 0 5.6"/>
+  </symbol>
+
+  <symbol id="icon-user-waiting" viewBox="0 0 24 24">
+    <circle cx="9.5" cy="7.5" r="3.2"/>
+    <path d="M3.5 20v-1.2a4.6 4.6 0 0 1 4.6-4.6h2.4"/>
+    <circle cx="17.5" cy="16.5" r="4"/>
+    <path d="M17.5 14.6v2l1.4.9"/>
+  </symbol>
+
+  <!-- ── Время и напоминания ────────────────────────────── -->
+  <symbol id="icon-clock" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M12 7.2V12l3.2 1.9"/>
+  </symbol>
+
+  <symbol id="icon-hourglass" viewBox="0 0 24 24">
+    <path d="M7 3.5h10M7 20.5h10"/>
+    <path d="M8 3.5v3.3c0 2 4 3.2 4 5.2s-4 3.2-4 5.2v3.3"/>
+    <path d="M16 3.5v3.3c0 2-4 3.2-4 5.2s4 3.2 4 5.2v3.3"/>
+  </symbol>
+
+  <symbol id="icon-calendar" viewBox="0 0 24 24">
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/>
+    <path d="M3.5 10h17"/>
+    <path d="M8.5 3.5V7M15.5 3.5V7"/>
+  </symbol>
+
+  <symbol id="icon-bell" viewBox="0 0 24 24">
+    <path d="M18 9.5a6 6 0 0 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5z"/>
+    <path d="M13.7 19.3a2 2 0 0 1-3.4 0"/>
+  </symbol>
+
+  <symbol id="icon-bell-off" viewBox="0 0 24 24">
+    <path d="M9 5.3A6 6 0 0 1 18 9.5c0 5 2 6.5 2 6.5H8.5"/>
+    <path d="M6.1 7.9A6 6 0 0 0 6 9.5c0 5-2 6.5-2 6.5h4.5"/>
+    <path d="M13.7 19.3a2 2 0 0 1-3.4 0"/>
+    <path d="M3.5 3.5l17 17"/>
+  </symbol>
+
+  <!-- ── Действия ───────────────────────────────────────── -->
+  <symbol id="icon-refresh" viewBox="0 0 24 24">
+    <path d="M20 11.5a8 8 0 1 0-2.6 6.4"/>
+    <path d="M20 5.5v6h-6"/>
+  </symbol>
+
+  <symbol id="icon-star" viewBox="0 0 24 24">
+    <path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85L12 3.6z"/>
+  </symbol>
+
+  <!-- Единственная иконка с заливкой: «в избранном» -->
+  <symbol id="icon-star-filled" viewBox="0 0 24 24">
+    <path fill="currentColor"
+          d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85L12 3.6z"/>
+  </symbol>
+
+  <symbol id="icon-settings" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.1 14.4a1.5 1.5 0 0 0 .3 1.65l.06.06a1.8 1.8 0 1 1-2.55 2.55l-.06-.06a1.5 1.5 0 0 0-1.65-.3 1.5 1.5 0 0 0-.9 1.37V20a1.8 1.8 0 1 1-3.6 0v-.1a1.5 1.5 0 0 0-.98-1.37 1.5 1.5 0 0 0-1.65.3l-.06.06A1.8 1.8 0 1 1 4.5 16.1l.06-.06a1.5 1.5 0 0 0 .3-1.65 1.5 1.5 0 0 0-1.37-.9H3.3a1.8 1.8 0 1 1 0-3.6h.1a1.5 1.5 0 0 0 1.37-.98 1.5 1.5 0 0 0-.3-1.65L4.5 7.2A1.8 1.8 0 1 1 7.05 4.65l.06.06a1.5 1.5 0 0 0 1.65.3h.07a1.5 1.5 0 0 0 .9-1.37V3.3a1.8 1.8 0 1 1 3.6 0v.1a1.5 1.5 0 0 0 .9 1.37 1.5 1.5 0 0 0 1.65-.3l.06-.06a1.8 1.8 0 1 1 2.55 2.55l-.06.06a1.5 1.5 0 0 0-.3 1.65v.07a1.5 1.5 0 0 0 1.37.9h.2a1.8 1.8 0 1 1 0 3.6h-.1a1.5 1.5 0 0 0-1.37.9z"/>
+  </symbol>
+
+  <symbol id="icon-back" viewBox="0 0 24 24">
+    <path d="M19 12H5"/>
+    <path d="M11.5 18.5 5 12l6.5-6.5"/>
+  </symbol>
+
+  <symbol id="icon-close" viewBox="0 0 24 24">
+    <path d="M18 6 6 18M6 6l12 12"/>
+  </symbol>
+
+  <symbol id="icon-check" viewBox="0 0 24 24">
+    <path d="M4.5 12.8l5 5L19.5 7"/>
+  </symbol>
+
+  <symbol id="icon-plus" viewBox="0 0 24 24">
+    <path d="M12 5v14M5 12h14"/>
+  </symbol>
+
+  <symbol id="icon-minus" viewBox="0 0 24 24">
+    <path d="M5 12h14"/>
+  </symbol>
+
+  <symbol id="icon-share" viewBox="0 0 24 24">
+    <path d="M12 3.5v11"/>
+    <path d="M8.2 7.3 12 3.5l3.8 3.8"/>
+    <path d="M5 14.5v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+  </symbol>
+
+  <symbol id="icon-info" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M12 11v5.2"/>
+    <path d="M12 7.9h.01"/>
+  </symbol>
+
+  <symbol id="icon-warning" viewBox="0 0 24 24">
+    <path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/>
+    <path d="M12 9.3v4.2"/>
+    <path d="M12 17h.01"/>
+  </symbol>
+
+  <symbol id="icon-alert" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M12 7.8V12.5"/>
+    <path d="M12 16.1h.01"/>
+  </symbol>
+
+  <symbol id="icon-report" viewBox="0 0 24 24">
+    <path d="M20 14.8a2 2 0 0 1-2 2H8.5L4.5 20.5V5.2a2 2 0 0 1 2-2H18a2 2 0 0 1 2 2z"/>
+    <path d="M12.2 7.3v3.6"/>
+    <path d="M12.2 13.3h.01"/>
+  </symbol>
+
+  <!-- ── Тема и язык ────────────────────────────────────── -->
+  <symbol id="icon-sun" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="4.2"/>
+    <path d="M12 2.6v2.2M12 19.2v2.2M3.8 12H6M18 12h2.2"/>
+    <path d="M6.2 6.2l1.6 1.6M16.2 16.2l1.6 1.6M17.8 6.2l-1.6 1.6M7.8 16.2l-1.6 1.6"/>
+  </symbol>
+
+  <symbol id="icon-moon" viewBox="0 0 24 24">
+    <path d="M20.5 14.3A8.7 8.7 0 0 1 9.7 3.5a8.7 8.7 0 1 0 10.8 10.8z"/>
+  </symbol>
+
+  <symbol id="icon-globe" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M3.5 12h17"/>
+    <path d="M12 3.5a13 13 0 0 1 0 17a13 13 0 0 1 0-17z"/>
+  </symbol>
+
+  <!-- ── Навигация ──────────────────────────────────────── -->
+  <symbol id="icon-arrow-up" viewBox="0 0 24 24">
+    <path d="M12 19.5V4.5"/>
+    <path d="M6.2 10.3 12 4.5l5.8 5.8"/>
+  </symbol>
+
+  <symbol id="icon-arrow-down" viewBox="0 0 24 24">
+    <path d="M12 4.5v15"/>
+    <path d="M6.2 13.7 12 19.5l5.8-5.8"/>
+  </symbol>
+
+  <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+    <path d="M4.5 12h15"/>
+    <path d="M13.7 6.2 19.5 12l-5.8 5.8"/>
+  </symbol>
+
+  <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+    <path d="M6 9.5 12 15.5l6-6"/>
+  </symbol>
+
+  <!-- ── Специальные ────────────────────────────────────── -->
+  <symbol id="icon-flame" viewBox="0 0 24 24">
+    <path d="M12 2.8s4.8 3.4 4.8 8.2a4.8 4.8 0 0 1-9.6 0c0-1.7.8-3.1.8-3.1"/>
+    <path d="M12 21.2a4.4 4.4 0 0 0 4.4-4.4c0-2.6-4.4-5.6-4.4-5.6s-4.4 3-4.4 5.6A4.4 4.4 0 0 0 12 21.2z"/>
+  </symbol>
+
+  <symbol id="icon-zap" viewBox="0 0 24 24">
+    <path d="M13.2 2.5 4.8 13.2h5.6l-.6 8.3 8.4-10.7h-5.6z"/>
+  </symbol>
+
+  <symbol id="icon-stairs" viewBox="0 0 24 24">
+    <path d="M3.5 20.5h4.2v-4.2h4.2v-4.2h4.2V7.9h4.4"/>
+    <path d="M20.5 3.5v4.4"/>
+  </symbol>
+
+  <symbol id="icon-camera" viewBox="0 0 24 24">
+    <path d="M20.5 18.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V9.3a2 2 0 0 1 2-2h2.4l1.5-2.4h5.2l1.5 2.4h2.4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13.5" r="3.4"/>
+  </symbol>
+
+  <symbol id="icon-signal" viewBox="0 0 24 24">
+    <path d="M12 20.5h.01"/>
+    <path d="M8.1 16.6a5.5 5.5 0 0 1 7.8 0"/>
+    <path d="M5 13.5a10 10 0 0 1 14 0"/>
+    <path d="M2 10.4a14.4 14.4 0 0 1 20 0"/>
+  </symbol>
+
+  <symbol id="icon-signal-low" viewBox="0 0 24 24">
+    <path d="M4 20.5v-3.2"/>
+    <path d="M9.3 20.5v-6.4" opacity="0.3"/>
+    <path d="M14.7 20.5v-9.6" opacity="0.3"/>
+    <path d="M20 20.5V7.7" opacity="0.3"/>
+  </symbol>
+
+  <symbol id="icon-signal-medium" viewBox="0 0 24 24">
+    <path d="M4 20.5v-3.2"/>
+    <path d="M9.3 20.5v-6.4"/>
+    <path d="M14.7 20.5v-9.6" opacity="0.3"/>
+    <path d="M20 20.5V7.7" opacity="0.3"/>
+  </symbol>
+
+  <symbol id="icon-signal-high" viewBox="0 0 24 24">
+    <path d="M4 20.5v-3.2"/>
+    <path d="M9.3 20.5v-6.4"/>
+    <path d="M14.7 20.5v-9.6"/>
+    <path d="M20 20.5V7.7"/>
+  </symbol>
+</svg>
+  </div>
+
   <!-- Плашка офлайна: показывается, когда рисуем данные из кэша -->
   <div class="offline" id="offline" hidden>
-    <span class="offline__icon" aria-hidden="true">📡</span>
+    <svg class="icon" aria-hidden="true"><use href="#icon-signal-low"></use></svg>
     <span id="offline-text"></span>
   </div>
 
@@ -62,37 +346,52 @@
           <!-- Общий статус системы: сколько лифтов свободно. Тап — наверх списка -->
           <button class="sysbtn is-loading" id="sys-status" type="button"
                   data-tone="ok" data-i18n-aria="a11y.sys">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="4" y="3" width="16" height="18" rx="2.5"/>
-              <path d="M12 3v18"/>
-              <path d="M8.2 9.4 9.9 7.5l1.7 1.9"/>
-              <path d="M12.4 14.6l1.7 1.9 1.7-1.9"/>
-            </svg>
+            <svg class="icon" aria-hidden="true"><use href="#icon-elevator"></use></svg>
             <span id="sys-free">—</span>
           </button>
 
           <span class="live" id="dot"></span>
+
+          <!-- Уведомления -->
+          <button class="iconbtn" id="notif-open" type="button"
+                  data-i18n-aria="a11y.notifications">
+            <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+          </button>
 
           <!-- Язык интерфейса -->
           <button class="chipbtn" id="lang-toggle" type="button" data-i18n-aria="a11y.lang">
             <span id="lang-label">RU</span>
           </button>
 
-          <button class="theme-toggle" id="theme-toggle" type="button"
+          <button class="iconbtn" id="theme-toggle" type="button"
                   data-i18n-aria="a11y.theme">
-            <span id="theme-icon">🌙</span>
+            <span id="theme-icon"></span>
           </button>
         </div>
       </div>
       <p class="hero__sub" data-i18n="home.subtitle">Тюменский индустриальный университет</p>
       <p class="hero__summary" id="summary" data-i18n="home.loading">Загружаем данные…</p>
 
-      <!-- Пиковые часы: показывается только во время пика или перед ним -->
-      <div class="peak" id="peak" hidden>
-        <span class="peak__icon" id="peak-icon">⚡</span>
-        <span id="peak-text"></span>
+      <!-- Сводка по работе лифтов: видна, только если работают не все -->
+      <div class="notice notice--warn" id="working" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#icon-status-maintenance"></use></svg>
+        <span id="working-text"></span>
       </div>
+
+      <!--
+        Очередь в холле первого этажа — единственное, что видят камеры.
+        Вторая строка появляется, только когда у какого-то лифта очередь
+        заметно длиннее остальных.
+      -->
+      <button class="floorbar" id="floorbar" type="button" hidden data-level="ok">
+        <svg class="icon" id="floorbar-icon" aria-hidden="true"><use href="#icon-status-ok"></use></svg>
+        <span class="floorbar__body">
+          <span id="floorbar-text"></span>
+          <span class="floorbar__hint" id="floorbar-hint" hidden></span>
+        </span>
+        <svg class="icon floorbar__go" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+      </button>
+
     </header>
 
     <!-- Заглушки на время первой загрузки -->
@@ -123,7 +422,7 @@
       </p>
 
       <button class="button button--accent" id="empty-retry" type="button">
-        <span class="empty__retry-icon" aria-hidden="true">↻</span>
+        <svg class="icon" id="empty-retry-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
         <span id="empty-retry-text" data-i18n="empty.retry">Повторить</span>
       </button>
     </div>
@@ -160,21 +459,32 @@
         <div class="floors" id="destination"><!-- кнопки строит app.js --></div>
       </section>
 
-      <!-- Онлайн-камера зоны ожидания -->
-      <section class="card card--camera">
+      <!-- Плашка вместо камеры, когда лифт сломан или на обслуживании -->
+      <section class="card card--down" id="detail-down" hidden>
+        <svg class="icon icon--large" id="down-icon" aria-hidden="true">
+          <use href="#icon-status-broken"></use>
+        </svg>
+        <b class="down__title" id="down-title">Лифт не работает</b>
+        <span class="down__note" id="down-note"></span>
+      </section>
+
+      <!-- Камера в холле первого этажа: только очередь к этому лифту -->
+      <section class="card card--camera" id="detail-camera">
         <div class="card__head">
-          <h2 class="card__title" data-i18n="detail.camera">Онлайн-камера</h2>
+          <h2 class="card__title" data-i18n="detail.camera">
+            Онлайн-камера · Холл, 1 этаж
+          </h2>
         </div>
 
         <div class="camera">
           <div class="camera__scene" id="camera-scene"><!-- кадр рисует app.js --></div>
 
           <!-- Элементы поверх кадра — на матовой подложке, как в плеере iOS -->
-          <span class="live-tag glass glass--over-media"><i></i>LIVE</span>
+          <span class="live-tag glass glass--over-media">
+            <svg class="icon icon--pulse" aria-hidden="true"><use href="#icon-online"></use></svg>LIVE
+          </span>
           <span class="camera__badge glass glass--over-media" id="camera-badge">—</span>
         </div>
-
-        <p class="card__caption" id="camera-caption">—</p>
       </section>
 
       <!-- Статистика -->
@@ -186,15 +496,19 @@
         </article>
 
         <article class="card metric">
-          <span class="metric__label" data-i18n="detail.waiting">Ожидают</span>
+          <span class="metric__label" data-i18n="detail.waiting">Ждут на 1 этаже</span>
           <b class="metric__value" id="d-waiting">0</b>
         </article>
 
         <article class="card metric">
-          <span class="metric__label" data-i18n="detail.wait">Ожидание</span>
+          <span class="metric__label metric__label--row">
+            <span data-i18n="detail.wait">Ожидание</span>
+            <!-- Точка уверенности: насколько прогнозу можно верить -->
+            <i class="confidence" id="d-confidence" data-level="high"></i>
+          </span>
           <span class="metric__line">
-            <b class="metric__value" id="d-wait">0</b>
-            <span class="metric__unit" id="d-wait-unit">секунд</span>
+            <b class="metric__value" id="d-wait">—</b>
+            <span class="metric__unit" id="d-wait-unit" hidden>секунд</span>
           </span>
         </article>
 
@@ -207,7 +521,7 @@
           <div class="metric__body">
             <span class="metric__label" data-i18n="detail.currentFloor">Текущий этаж</span>
             <b class="metric__value" id="d-floor">0</b>
-            <span class="metric__dir" id="d-direction">•</span>
+            <span class="metric__dir" id="d-direction"></span>
           </div>
         </article>
 
@@ -222,7 +536,7 @@
 
           <div class="compare__row" id="cmp-elevator">
             <span class="compare__name">
-              <span class="compare__emoji">🛗</span>
+              <svg class="icon" aria-hidden="true"><use href="#icon-elevator"></use></svg>
               <span data-i18n="compare.elevator">Лифт</span>
             </span>
             <b class="compare__time" id="cmp-elevator-time">—</b>
@@ -230,7 +544,7 @@
 
           <div class="compare__row" id="cmp-stairs">
             <span class="compare__name">
-              <span class="compare__emoji">🚶</span>
+              <svg class="icon" aria-hidden="true"><use href="#icon-stairs"></use></svg>
               <span data-i18n="compare.stairs">Лестница</span>
             </span>
             <b class="compare__time" id="cmp-stairs-time">—</b>
@@ -242,7 +556,7 @@
 
       <!-- Жалоба на лифт -->
       <button class="button button--outline" id="report-open" type="button">
-        <span aria-hidden="true">⚠</span>
+        <svg class="icon" aria-hidden="true"><use href="#icon-report"></use></svg>
         <span data-i18n="report.button">Сообщить о проблеме</span>
       </button>
     </div>
@@ -250,14 +564,18 @@
     <!-- Тулбар прижат к низу: контент прокручивается под стеклом -->
     <div class="toolbar glass">
       <div class="toolbar__inner">
-        <button class="button" id="refresh" type="button" data-i18n="detail.refresh">Обновить</button>
+        <button class="button" id="refresh" type="button">
+          <svg class="icon" id="refresh-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+          <span id="refresh-text" data-i18n="detail.refresh">Обновить</span>
+        </button>
       </div>
     </div>
   </section>
 
-  <!-- ══ Модалка «сообщить о проблеме» ══════════════════ -->
+  <!-- Общая подложка для нижних модалок -->
   <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
 
+  <!-- ══ Модалка «сообщить о проблеме» ══════════════════ -->
   <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
        aria-labelledby="sheet-title">
     <div class="sheet__grabber" aria-hidden="true"></div>
@@ -279,9 +597,54 @@
     </div>
   </div>
 
+  <!-- ══ Модалка «настройки уведомлений» ════════════════ -->
+  <div class="sheet" id="notif-sheet" hidden role="dialog" aria-modal="true"
+       aria-labelledby="notif-title">
+    <div class="sheet__grabber" aria-hidden="true"></div>
+
+    <h2 class="sheet__title" id="notif-title" data-i18n="notif.title">
+      Настройки уведомлений
+    </h2>
+
+    <div class="sheet__scroll">
+      <!-- Главный выключатель -->
+      <label class="switch" for="notif-enabled">
+        <span class="switch__text">
+          <svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg>
+          <span data-i18n="notif.enabled">Получать уведомления</span>
+        </span>
+        <input class="switch__input" type="checkbox" id="notif-enabled" />
+        <span class="switch__track" aria-hidden="true"><i></i></span>
+      </label>
+
+      <!-- Мой этаж -->
+      <span class="sheet__label" data-i18n="notif.floorLabel">Мой этаж</span>
+      <div class="floors" id="notif-floors"><!-- кнопки строит app.js --></div>
+
+      <!-- Типы уведомлений -->
+      <span class="sheet__label" data-i18n="notif.typesLabel">Что присылать</span>
+      <div class="checks" id="notif-types"><!-- строит app.js --></div>
+
+      <!-- Порог для «много людей на моём этаже» -->
+      <div class="slider" id="notif-threshold-row">
+        <span class="sheet__label" id="notif-threshold-label">Порог</span>
+        <input class="slider__input" type="range" id="notif-threshold"
+               min="5" max="30" step="1" value="12" />
+      </div>
+    </div>
+
+    <div class="sheet__actions">
+      <button class="button button--ghost" id="notif-cancel" type="button"
+              data-i18n="notif.cancel">Закрыть</button>
+      <button class="button button--accent" id="notif-save" type="button"
+              data-i18n="notif.save">Сохранить</button>
+    </div>
+  </div>
+
   <!-- Тост после отправки -->
   <div class="toast" id="toast" hidden></div>
 
+  <script src="icons.js"></script>
   <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>

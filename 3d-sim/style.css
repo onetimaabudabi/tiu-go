@@ -1,0 +1,299 @@
+/**
+ * Оформление панелей 3D-визуализации.
+ *
+ * Стиль намеренно совпадает с мини-приложением TIU GO: тёмная подложка,
+ * стеклянные карточки, тот же акцентный синий. Цвета вынесены в
+ * переменные — палитра сцены задаётся в logic/params.js, а палитра
+ * интерфейса здесь.
+ */
+
+:root {
+  --bg: #0b0f14;
+  --panel: rgba(18, 23, 30, 0.82);
+  --panel-line: rgba(255, 255, 255, 0.09);
+  --fg: #e8edf2;
+  --fg-dim: #97a2ad;
+  --fg-mute: #6b7682;
+  --accent: #4b8cf7;
+  --accent-ink: #ffffff;
+  --free: #4ad991;
+  --busy: #ffd166;
+  --full: #ff7a73;
+  --radius: 14px;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  font-synthesis-weight: none;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+[hidden] { display: none !important; }
+
+/* ---------- Панели ---------- */
+
+.panel {
+  position: fixed;
+  z-index: 5;
+  background: var(--panel);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.panel--left { top: 16px; left: 16px; width: 272px; }
+.panel--right { top: 16px; right: 16px; width: 248px; }
+.panel--bottom { left: 50%; transform: translateX(-50%); bottom: 16px; width: min(760px, calc(100vw - 32px)); }
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.panel__title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.panel__actions { display: flex; align-items: center; gap: 8px; }
+
+.panel__toggle {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: 1px solid var(--panel-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel__toggle:hover { color: var(--fg); border-color: rgba(255, 255, 255, 0.22); }
+
+.panel__body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.panel.collapsed .panel__body { display: none; }
+
+/* На невысоком окне панели прокручиваются, а не выезжают за экран */
+.panel--left .panel__body,
+.panel--right .panel__body { max-height: calc(100vh - 80px); overflow-y: auto; }
+.panel--bottom .panel__body { max-height: min(42vh, 380px); overflow-y: auto; }
+
+/* ---------- Кнопки ---------- */
+
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+.row--main { gap: 8px; }
+
+.group { display: flex; flex-direction: column; gap: 6px; }
+
+.group__label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 550;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover { background: rgba(255, 255, 255, 0.09); }
+.btn--small { flex: 0 0 auto; padding: 5px 10px; font-size: 11.5px; }
+
+.btn--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.btn--primary:hover { background: #5d99f8; }
+
+.btn.is-active {
+  background: rgba(75, 140, 247, 0.22);
+  border-color: rgba(75, 140, 247, 0.55);
+  color: #cfe0ff;
+}
+
+.btn.is-recording { background: var(--full); border-color: transparent; color: #2a0e0c; }
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--busy);
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+/* ---------- Статистика ---------- */
+
+.clock {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.clock__sub { font-size: 11.5px; color: var(--fg-mute); margin-top: 3px; }
+
+.stats { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; }
+
+.stats dt { font-size: 12px; color: var(--fg-dim); min-width: 0; }
+
+.stats dd {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.stats dd.is-free { color: var(--free); }
+.stats dd.is-busy { color: var(--busy); }
+.stats dd.is-full { color: var(--full); }
+
+.legend { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 2px; }
+.legend__row { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--fg-mute); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot--free { background: var(--free); }
+.dot--busy { background: var(--busy); }
+.dot--full { background: var(--full); }
+
+.fps {
+  font-size: 10.5px;
+  color: var(--fg-mute);
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--panel-line);
+  padding-top: 8px;
+}
+
+/* ---------- Графики ---------- */
+
+.panel__body--charts { flex-direction: row; gap: 14px; }
+.chart { flex: 1 1 0; min-width: 0; }
+.chart__title { font-size: 11px; color: var(--fg-mute); margin-bottom: 6px; }
+.chart canvas { width: 100% !important; height: 150px !important; }
+
+/* ---------- Загрузка ---------- */
+
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 35%, #182230 0%, #0b0f14 70%);
+  transition: opacity 0.45s ease;
+}
+
+.loader.is-done { opacity: 0; pointer-events: none; }
+
+.loader__box { width: min(360px, calc(100vw - 48px)); text-align: center; }
+.loader__title { font-size: 20px; font-weight: 700; letter-spacing: 0.04em; }
+.loader__sub { margin-top: 6px; font-size: 12.5px; color: var(--fg-dim); min-height: 18px; }
+
+.loader__bar {
+  margin-top: 14px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.loader__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.loader__note { margin-top: 10px; font-size: 11px; color: var(--fg-mute); line-height: 1.45; }
+
+/* ---------- Всплывающее сообщение ---------- */
+
+.toast {
+  position: fixed;
+  z-index: 30;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(18, 23, 30, 0.95);
+  border: 1px solid var(--panel-line);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  color: var(--fg);
+  max-width: min(520px, calc(100vw - 32px));
+  text-align: center;
+}
+
+/* ---------- Узкий экран ---------- */
+
+@media (max-width: 900px) {
+  .panel--left, .panel--right { width: calc(50vw - 24px); }
+  .panel--bottom { bottom: 12px; }
+  .panel__body--charts { flex-direction: column; }
+}
+
+/* Совсем узкое окно: панели ужимаются, чтобы сцена осталась видна */
+@media (max-width: 620px) {
+  .panel--left, .panel--right { width: calc(50vw - 20px); }
+  .panel--left { left: 10px; top: 10px; }
+  .panel--right { right: 10px; top: 10px; }
+  .panel__body { padding: 9px; gap: 9px; }
+  .btn { padding: 6px 8px; font-size: 11.5px; }
+  .clock { font-size: 24px; }
+  .stats dt, .stats dd { font-size: 11px; }
+}
+
+/* Низкое окно: графики ужимаются, иначе панель съедает всю сцену */
+@media (max-height: 700px) {
+  .chart canvas { height: 104px !important; }
+  .panel--bottom .panel__body { max-height: 38vh; }
+}
