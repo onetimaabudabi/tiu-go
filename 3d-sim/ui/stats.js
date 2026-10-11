@@ -10,12 +10,17 @@
 import Chart from 'chart.js/auto';
 import { ELEVATORS, SIM } from '../logic/params.js';
 
+// Счётчики, зависящие от режима, идут после разделителя: при
+// переключении технической части они обнуляются, и видно, с какого
+// момента считаем.
 const ROWS = [
   { key: 'inHall', label: 'Людей в холле' },
   { key: 'inLifts', label: 'Людей в лифтах' },
   { key: 'toStairs', label: 'Ушло на лестницу' },
   { key: 'avgWait', label: 'Среднее ожидание', format: (v) => `${Math.round(v)} с` },
   { key: 'served', label: 'Увезли всего' },
+  { key: 'stops', label: 'Остановок' },
+  { key: 'uselessStops', label: 'Впустую открыли двери' },
   { key: 'passes', label: 'Проехали мимо' },
   { key: 'working', label: 'Работают' }
 ];
@@ -102,7 +107,11 @@ export function createStats(app, sim) {
     const s = sim.stats;
 
     clock.textContent = sim.clockLabel;
-    phase.textContent = app.running ? sim.phaseLabel : 'на паузе · ' + sim.phaseLabel;
+
+    const mode = sim.systemOn ? 'система включена' : 'система выключена';
+    phase.textContent = (app.running ? sim.phaseLabel : 'на паузе · ' + sim.phaseLabel) +
+      ' · ' + mode;
+    phase.classList.toggle('is-off', !sim.systemOn);
 
     const level = s.inHall >= 16 ? 'full' : s.inHall > 5 ? 'busy' : 'free';
 
@@ -113,6 +122,8 @@ export function createStats(app, sim) {
     }
 
     set('inHall', String(s.inHall), level);
+    // Бесполезная остановка — это и есть цена выключенной системы
+    set('uselessStops', String(s.uselessStops), s.uselessStops > 0 ? 'full' : 'free');
     set('working', `${ELEVATORS.working.length} из ${ELEVATORS.total}`,
       ELEVATORS.working.length < ELEVATORS.total ? 'busy' : 'free');
 

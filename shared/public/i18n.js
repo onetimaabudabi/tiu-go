@@ -81,6 +81,8 @@
       // Время
       'time.sec': 'сек',
       'time.min': 'мин',
+      'time.hour': 'ч',
+      'time.day': 'дн',
 
 
       'offline.title': 'Нет связи · данные от {time}',
@@ -150,6 +152,81 @@
       'notif.error': 'Не удалось сохранить подписку',
       'notif.cancel': 'Закрыть',
 
+
+      // ---------- Прогноз на 5-10 минут ----------
+      'forecast.title': 'Прогноз',
+      'forecast.now': 'Сейчас',
+      'forecast.in5': 'Через 5 мин',
+      'forecast.in10': 'Через 10 мин',
+      'forecast.cabin': '{n}/{capacity} внутри',
+      'forecast.waiting': '{n} ждут',
+      'forecast.queueUp': 'Через 5 минут очередь вырастет до {n} {people}',
+      'forecast.queueDown': 'Через 5 минут очередь снизится до {n} {people}',
+      'forecast.warmup': 'Прогноз появится через пару минут наблюдений',
+
+      'trend.growing': 'растёт',
+      'trend.falling': 'падает',
+      'trend.stable': 'стабильно',
+
+      // ---------- Планировщик выхода ----------
+      'plan.open': 'Планировщик выхода',
+      'plan.title': 'Планировщик выхода',
+      'plan.subtitle': 'Посчитаем, когда выходить, чтобы успеть вовремя',
+      'plan.from': 'Сейчас на этаже',
+      'plan.to': 'Нужно попасть на этаж',
+      'plan.time': 'К какому времени',
+      'plan.day': 'День недели',
+      'plan.calc': 'Рассчитать',
+      'plan.exitAt': 'Выходи в {time}',
+      'plan.explain': 'До нужного времени {left}. Ожидание лифта — {wait}. Дорога — {travel}. Запас — {buffer}.',
+      'plan.statusOk': 'Есть время',
+      'plan.statusSoon': 'Скоро выходить',
+      'plan.statusNow': 'Пора выходить',
+      'plan.calendar': 'Добавить в календарь',
+      'plan.calendarTitle': 'Выходить к лифту',
+      'plan.calendarNote': 'Лифт с {from} на {to} этаж. Ожидание ~{wait}.',
+      'plan.sourceHistory': 'По наблюдениям за этот час: {n} замеров',
+      'plan.sourceSchedule': 'Наблюдений за этот час пока мало — считаем по расписанию пар',
+      'plan.back': 'К лифтам',
+      'plan.error': 'Не удалось рассчитать. Проверь соединение.',
+      'plan.late': 'Это время уже прошло — выбери более позднее',
+      'plan.minutes': ['минута', 'минуты', 'минут'],
+      'plan.days': ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
+
+      // ---------- Кольцо ожидания ----------
+      'ring.arrived': 'Лифт должен приехать',
+      'ring.late': 'Лифт задерживается',
+
+      // ---------- Поделиться ----------
+      'share.button': 'Поделиться',
+      'share.title': 'Поделиться статусом',
+      'share.copy': 'Скопировать текст',
+      'share.copied': 'Скопировано',
+      'share.telegram': 'В Telegram',
+      'share.max': 'В MAX',
+      'share.system': 'Системное меню',
+      'share.failed': 'Не удалось скопировать',
+      'share.head': 'TIU GO — статус лифта',
+      'share.state': 'Сейчас: {occupancy}/{capacity} внутри, {waiting} ждут на 1 этаже',
+      'share.wait': 'Прогноз ожидания: {wait}',
+      'share.rec': 'Рекомендация: {rec}',
+      'share.updated': 'Обновлено: {time}',
+      'share.more': 'Подробнее: {url}',
+      'share.broken': 'Не работает',
+
+      // ---------- Канал проекта ----------
+      'subscribe.title': 'Новости TIU GO',
+      'subscribe.text': 'Подпишись на канал, чтобы первым узнать о бета-версии и обновлениях',
+      'subscribe.button': 'Открыть канал',
+      'subscribe.missing': 'Ссылка на канал пока не настроена',
+
+      // ---------- Вибрация ----------
+      'notif.haptics': 'Вибрация при событиях',
+      'notif.hapticsHint': 'Короткий отклик, когда лифт подходит, приезжает или ломается',
+
+      'a11y.channel': 'Канал проекта',
+      'a11y.planner': 'Планировщик выхода',
+
       'a11y.theme': 'Переключить тему',
       'a11y.lang': 'Переключить язык',
       'a11y.sys': 'Свободных лифтов — к началу списка',
@@ -210,6 +287,8 @@
 
       'time.sec': 'sec',
       'time.min': 'min',
+      'time.hour': 'h',
+      'time.day': 'd',
 
 
       'offline.title': 'Offline · data from {time}',
@@ -270,6 +349,81 @@
       'notif.savedLocal': 'Saved on this device. The subscription starts when opened from Telegram or MAX',
       'notif.error': 'Could not save the subscription',
       'notif.cancel': 'Close',
+
+
+      // ---------- Прогноз на 5-10 минут ----------
+      'forecast.title': 'Forecast',
+      'forecast.now': 'Now',
+      'forecast.in5': 'In 5 min',
+      'forecast.in10': 'In 10 min',
+      'forecast.cabin': '{n}/{capacity} inside',
+      'forecast.waiting': '{n} waiting',
+      'forecast.queueUp': 'In 5 minutes the queue grows to {n} {people}',
+      'forecast.queueDown': 'In 5 minutes the queue drops to {n} {people}',
+      'forecast.warmup': 'The forecast needs a couple of minutes of data',
+
+      'trend.growing': 'growing',
+      'trend.falling': 'falling',
+      'trend.stable': 'stable',
+
+      // ---------- Планировщик выхода ----------
+      'plan.open': 'Exit planner',
+      'plan.title': 'Exit planner',
+      'plan.subtitle': 'Work out when to leave so you are not late',
+      'plan.from': 'You are on floor',
+      'plan.to': 'You need floor',
+      'plan.time': 'Be there by',
+      'plan.day': 'Day of week',
+      'plan.calc': 'Calculate',
+      'plan.exitAt': 'Leave at {time}',
+      'plan.explain': '{left} until that time. Elevator wait — {wait}. Ride — {travel}. Buffer — {buffer}.',
+      'plan.statusOk': 'You have time',
+      'plan.statusSoon': 'Leave soon',
+      'plan.statusNow': 'Leave now',
+      'plan.calendar': 'Add to calendar',
+      'plan.calendarTitle': 'Head to the elevator',
+      'plan.calendarNote': 'Elevator from floor {from} to {to}. Wait ~{wait}.',
+      'plan.sourceHistory': 'From observations for this hour: {n} samples',
+      'plan.sourceSchedule': 'Not enough data for this hour yet — using the class schedule',
+      'plan.back': 'Back to elevators',
+      'plan.error': 'Could not calculate. Check your connection.',
+      'plan.late': 'That time has passed — pick a later one',
+      'plan.minutes': ['minute', 'minutes'],
+      'plan.days': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+
+      // ---------- Кольцо ожидания ----------
+      'ring.arrived': 'The elevator should be here',
+      'ring.late': 'The elevator is late',
+
+      // ---------- Поделиться ----------
+      'share.button': 'Share',
+      'share.title': 'Share the status',
+      'share.copy': 'Copy text',
+      'share.copied': 'Copied',
+      'share.telegram': 'To Telegram',
+      'share.max': 'To MAX',
+      'share.system': 'System menu',
+      'share.failed': 'Could not copy',
+      'share.head': 'TIU GO — elevator status',
+      'share.state': 'Now: {occupancy}/{capacity} inside, {waiting} waiting on floor 1',
+      'share.wait': 'Expected wait: {wait}',
+      'share.rec': 'Recommendation: {rec}',
+      'share.updated': 'Updated: {time}',
+      'share.more': 'More: {url}',
+      'share.broken': 'Out of service',
+
+      // ---------- Канал проекта ----------
+      'subscribe.title': 'TIU GO News',
+      'subscribe.text': 'Subscribe to be the first to know about the beta and updates',
+      'subscribe.button': 'Open channel',
+      'subscribe.missing': 'The channel link is not configured yet',
+
+      // ---------- Вибрация ----------
+      'notif.haptics': 'Vibrate on events',
+      'notif.hapticsHint': 'A short buzz when the elevator approaches, arrives or breaks down',
+
+      'a11y.channel': 'Project channel',
+      'a11y.planner': 'Exit planner',
 
       'a11y.theme': 'Switch theme',
       'a11y.lang': 'Switch language',
@@ -333,6 +487,8 @@
 
       'time.sec': '秒',
       'time.min': '分',
+      'time.hour': '小时',
+      'time.day': '天',
 
       // «через N минут начнётся X» по-китайски строится от самого события,
       // иначе два «后» подряд читаются как спотыкание
@@ -396,6 +552,81 @@
       'notif.savedLocal': '已保存在本机。从 Telegram 或 MAX 打开时会自动订阅',
       'notif.error': '订阅保存失败',
       'notif.cancel': '关闭',
+
+
+      // ---------- Прогноз на 5-10 минут ----------
+      'forecast.title': '预测',
+      'forecast.now': '现在',
+      'forecast.in5': '5 分钟后',
+      'forecast.in10': '10 分钟后',
+      'forecast.cabin': '轿厢 {n}/{capacity}',
+      'forecast.waiting': '{n} 人在等',
+      'forecast.queueUp': '5 分钟后队列将增至 {n} {people}',
+      'forecast.queueDown': '5 分钟后队列将减至 {n} {people}',
+      'forecast.warmup': '再观测几分钟才能给出预测',
+
+      'trend.growing': '增加',
+      'trend.falling': '减少',
+      'trend.stable': '稳定',
+
+      // ---------- Планировщик выхода ----------
+      'plan.open': '出发规划',
+      'plan.title': '出发规划',
+      'plan.subtitle': '算一算什么时候出发才不会迟到',
+      'plan.from': '你现在在几层',
+      'plan.to': '你要去几层',
+      'plan.time': '需要几点到',
+      'plan.day': '星期',
+      'plan.calc': '计算',
+      'plan.exitAt': '{time} 出发',
+      'plan.explain': '距离目标时间还有 {left}。等梯 {wait}，行程 {travel}，余量 {buffer}。',
+      'plan.statusOk': '时间充裕',
+      'plan.statusSoon': '快该出发了',
+      'plan.statusNow': '该出发了',
+      'plan.calendar': '加入日历',
+      'plan.calendarTitle': '前往电梯',
+      'plan.calendarNote': '从 {from} 层到 {to} 层，预计等待 {wait}。',
+      'plan.sourceHistory': '依据该时段的 {n} 次观测',
+      'plan.sourceSchedule': '该时段观测还不够，按课表估算',
+      'plan.back': '返回电梯列表',
+      'plan.error': '计算失败，请检查网络。',
+      'plan.late': '这个时间已经过去了，请选择更晚的时间',
+      'plan.minutes': ['分钟'],
+      'plan.days': ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'],
+
+      // ---------- Кольцо ожидания ----------
+      'ring.arrived': '电梯应该到了',
+      'ring.late': '电梯晚点了',
+
+      // ---------- Поделиться ----------
+      'share.button': '分享',
+      'share.title': '分享电梯状态',
+      'share.copy': '复制文本',
+      'share.copied': '已复制',
+      'share.telegram': '分享到 Telegram',
+      'share.max': '分享到 MAX',
+      'share.system': '系统分享',
+      'share.failed': '复制失败',
+      'share.head': 'TIU GO — 电梯状态',
+      'share.state': '当前：轿厢 {occupancy}/{capacity}，一层 {waiting} 人在等',
+      'share.wait': '预计等待：{wait}',
+      'share.rec': '建议：{rec}',
+      'share.updated': '更新时间：{time}',
+      'share.more': '详情：{url}',
+      'share.broken': '停运',
+
+      // ---------- Канал проекта ----------
+      'subscribe.title': 'TIU GO 频道',
+      'subscribe.text': '订阅频道，第一时间获知测试版和更新',
+      'subscribe.button': '打开频道',
+      'subscribe.missing': '频道链接尚未配置',
+
+      // ---------- Вибрация ----------
+      'notif.haptics': '事件震动提示',
+      'notif.hapticsHint': '电梯临近、到达或故障时轻微震动',
+
+      'a11y.channel': '项目频道',
+      'a11y.planner': '出发规划',
 
       'a11y.theme': '切换主题',
       'a11y.lang': '切换语言',

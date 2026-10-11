@@ -32,6 +32,19 @@
         <button class="btn" id="btn-reset" type="button">↺ Сброс</button>
       </div>
 
+      <!-- Выключатель технической части проекта -->
+      <div class="group">
+        <div class="group__label">Техническая часть</div>
+        <button class="btn btn--switch is-on" id="btn-system" type="button" aria-pressed="true">
+          <span class="led"></span>
+          <span id="btn-system-text">Камера и пропуск: ВКЛ</span>
+        </button>
+        <p class="note" id="system-note">
+          Камера считает людей в кабине, и полный лифт проезжает мимо вызова.
+        </p>
+        <button class="btn btn--small" id="btn-compare" type="button">⚖ Сравнить режимы</button>
+      </div>
+
       <div class="group">
         <div class="group__label">Скорость</div>
         <div class="row" id="speed-row"></div>
@@ -99,6 +112,51 @@
       </div>
     </div>
   </section>
+
+  <!-- ---------- Сравнение режимов ---------- -->
+  <div class="overlay" id="compare-overlay" hidden>
+    <section class="panel panel--modal" id="panel-compare">
+      <div class="panel__head">
+        <span class="panel__title">С технической частью и без неё</span>
+        <div class="panel__actions">
+          <button class="btn btn--small" id="btn-compare-run" type="button">Пересчитать</button>
+          <button class="panel__toggle" id="btn-compare-close" type="button" aria-label="Закрыть">×</button>
+        </div>
+      </div>
+
+      <div class="panel__body">
+        <p class="note" id="compare-intro">
+          Один и тот же учебный день разыгрывается дважды: одни и те же люди,
+          одно зерно, разница только в правиле остановки.
+        </p>
+
+        <p class="verdict" id="compare-verdict" hidden></p>
+
+        <div class="progress" id="compare-progress" hidden>
+          <div class="progress__fill" id="compare-progress-fill"></div>
+        </div>
+
+        <table class="table" id="compare-table" hidden>
+          <thead>
+            <tr>
+              <th>Показатель</th>
+              <th>Без системы</th>
+              <th>С системой</th>
+              <th>Разница</th>
+            </tr>
+          </thead>
+          <tbody id="compare-rows"></tbody>
+        </table>
+
+        <p class="note" id="compare-note" hidden></p>
+
+        <div class="group">
+          <div class="group__label">Чем считали</div>
+          <dl class="stats stats--params" id="compare-params"></dl>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <div class="toast" id="toast" hidden></div>
 

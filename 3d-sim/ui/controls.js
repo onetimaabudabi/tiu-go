@@ -1,5 +1,6 @@
 /**
- * Панель управления: пуск, скорость, сценарии, камера, запись видео.
+ * Панель управления: пуск, техническая часть, скорость, сценарии,
+ * камера, запись видео.
  *
  * Кнопки скоростей собираются из SIM.speeds, сценарии — из SCENARIOS,
  * слежение — по числу работающих лифтов. Ничего не прописано руками:
@@ -7,6 +8,7 @@
  */
 
 import { SIM, SCENARIOS, ELEVATORS } from '../logic/params.js';
+import { createComparison } from './comparison.js';
 
 export function createControls(app, sim) {
   const $ = (id) => document.getElementById(id);
@@ -14,6 +16,10 @@ export function createControls(app, sim) {
   const btnPlay = $('btn-play');
   const btnReset = $('btn-reset');
   const btnRecord = $('btn-record');
+  const btnSystem = $('btn-system');
+  const btnSystemText = $('btn-system-text');
+  const btnCompare = $('btn-compare');
+  const systemNote = $('system-note');
   const speedRow = $('speed-row');
   const scenarioRow = $('scenario-row');
   const cameraRow = $('camera-row');
@@ -66,6 +72,49 @@ export function createControls(app, sim) {
     say(`Сброшено на ${scenario.hhmm} — ${scenario.label}`);
   });
 
+  // ---------- техническая часть ----------
+  //
+  // Кнопка включает и выключает то, ради чего проект затевался: камеру
+  // в кабине и решение «остановиться или проехать». С ней полный лифт
+  // проезжает мимо вызова, без неё — тормозит на каждом, открывает
+  // двери и никого не сажает.
+
+  const SYSTEM_TEXT = {
+    on: {
+      label: 'Камера и пропуск: ВКЛ',
+      note: 'Камера считает людей в кабине, и полный лифт проезжает мимо вызова.'
+    },
+    off: {
+      label: 'Камера и пропуск: ВЫКЛ',
+      note: 'Лифт тормозит на каждом вызове. У полной кабины это семь секунд ' +
+        'дверей впустую — и для тех, кто внутри, и для тех, кто ждёт выше.'
+    }
+  };
+
+  function refreshSystem() {
+    const on = sim.systemOn;
+    const text = on ? SYSTEM_TEXT.on : SYSTEM_TEXT.off;
+
+    btnSystemText.textContent = text.label;
+    systemNote.textContent = text.note;
+    btnSystem.classList.toggle('is-on', on);
+    btnSystem.classList.toggle('is-off', !on);
+    btnSystem.setAttribute('aria-pressed', String(on));
+  }
+
+  btnSystem.addEventListener('click', () => {
+    sim.setSystem(!sim.systemOn);
+    refreshSystem();
+    say(sim.systemOn
+      ? 'Техническая часть включена — счётчики режима обнулены'
+      : 'Техническая часть выключена — лифт тормозит на каждом вызове');
+  });
+
+  refreshSystem();
+
+  const comparison = createComparison(app);
+  btnCompare.addEventListener('click', () => comparison.open());
+
   // ---------- скорость ----------
 
   const speedButtons = SIM.speeds.map((value) => makeButton(
@@ -116,6 +165,9 @@ export function createControls(app, sim) {
 
   // Камеру перехватили мышью — снимаем подсветку с кнопок
   window.__tiuOnCameraGrab = () => markActive([...viewButtons, ...followButtons], null);
+  // Окно сравнения останавливает день и возвращает его обратно —
+  // кнопка «Пуск» должна об этом знать.
+  window.__tiuOnSimResumed = () => refreshPlay();
   window.__tiuOnQuality = (level) => {
     if (!controlsReady) return;      // стартовый уровень объявлять незачем
     say(`Детализация: ${level.name} — полных моделей ${level.fullDetail}`, 3000);
@@ -196,10 +248,12 @@ export function createControls(app, sim) {
       refreshPlay();
     }
     if (event.code === 'KeyR') btnReset.click();
+    if (event.code === 'KeyS') btnSystem.click();
+    if (event.code === 'KeyC') btnCompare.click();
   });
 
   refreshPlay();
   controlsReady = true;
 
-  return { say, refreshPlay };
+  return { say, refreshPlay, refreshSystem, comparison };
 }

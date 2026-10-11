@@ -1,0 +1,18 @@
+file:        /Users/a1111/.claude/skills/tiktok-video/projects/tiu-go-ru/final.mp4
+duration:    10.6s
+video:       1080x1920 @ 30.0fps h264
+audio:       aac 2ch
+loudness:    -15.0 LUFS (target ~ -15)
+size:        2.0 MB
+
+== checks ==
+[!] duration in short-form range (20–95s)
+[x] has audio stream
+[x] loudness near target
+[x] asset titles match scene keywords
+[x] cuts land on the beat (avg 8ms, worst 14ms across 2 cuts)
+
+== attribution (paste into video description) ==
+Music: "Danse Morialta" — Kevin MacLeod (incompetech.com), CC BY, via Wikimedia Commons
+
+[!] no fact-check sources recorded — verify script claims before publishing

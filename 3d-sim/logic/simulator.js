@@ -8,6 +8,11 @@
  *   • останавливаться или проезжать — logic/dispatch.js, то есть
  *     гистерезис из tech-model/03 с запасом мест из tech-model/07.
  *
+ * Техническую часть можно выключить (setSystem). Тогда камера и логика
+ * пропуска не работают, и лифт тормозит на каждом вызове — даже если
+ * кабина полная и войти некому. Такая остановка стоит полного цикла
+ * дверей, и именно из неё складывается разница между режимами.
+ *
  * Люди бывают двух сортов: с телом и без. Без тела — те, кому не хватило
  * лимита сцены. Они живут по той же логике и попадают в статистику,
  * просто их не видно. Так на обеденном пике картинка не превращается
@@ -16,17 +21,27 @@
 
 import * as THREE from 'three';
 import {
-  BUILDING, ELEVATORS, HALL, SIM, DISPATCH, CABIN,
-  liftX, floorY, hhmmToHours, hoursToHHMM
+  BUILDING, ELEVATORS, HALL, SIM, DISPATCH,
+  frontOf, floorY, hhmmToHours, hoursToHHMM
 } from './params.js';
-import { Queue, hallSlot, cabinSlot, doorwaySlot, VISIBLE_SLOTS } from './queue.js';
+import {
+  Queue, hallSlot, cabinSlot, doorwaySlot, doorFacing, landingSlot,
+  VISIBLE_SLOTS, LANDING_SLOTS
+} from './queue.js';
 import { decideCall, makeRng } from './dispatch.js';
 
-// Точки появления и ухода
-const ENTRANCE = { x: HALL.entranceX + 1.6, z: HALL.entranceZ };
-const ENTRANCE_IN = { x: HALL.entranceX - 1.4, z: HALL.entranceZ };
-const STAIRS = { x: HALL.entranceX + 1.6, z: HALL.stairsZ };
-const STAIRS_IN = { x: HALL.entranceX - 1.2, z: HALL.stairsZ };
+// Точки появления и ухода. Вход — в торце коридора, лестница — в стене
+// вестибюля: оба проёма берутся из геометрии холла, а не на глаз.
+const ENTRANCE = { x: HALL.entranceX + 1.6, z: 0 };
+const ENTRANCE_IN = { x: HALL.entranceX - 1.2, z: 0 };
+const STAIRS_IN = {
+  x: HALL.stairsX,
+  z: HALL.stairsSide * (HALL.doorPlane - 0.7)
+};
+const STAIRS = {
+  x: HALL.stairsX,
+  z: HALL.stairsSide * (HALL.doorPlane + 1.5)
+};
 
 let personSeq = 0;
 
@@ -39,6 +54,10 @@ export class Simulator {
     this.hall = app.hall;
 
     this.working = this.elevators.filter((l) => !l.broken);
+
+    // Техническая часть проекта: камера в кабине плюс решение
+    // «остановиться или проехать». Выключателем служит setSystem().
+    this.systemOn = true;
 
     this.rng = makeRng(SIM.peakIntervals.length * 7919 + BUILDING.floors);
 
@@ -68,17 +87,48 @@ export class Simulator {
     for (const agent of this.agents) agent.reset();
 
     this.time = startHour * 3600;        // модельные секунды от полуночи
+    this.modeSince = this.time;
     this.lobbyDebt = 0;
     this.upperDebt = 0;
 
     this.stats = {
       inHall: 0, inLifts: 0, toStairs: 0, served: 0,
       avgWait: 0, maxQueue: 0, passes: 0, wrongPasses: 0, uselessStops: 0,
-      waitSum: 0, waitCount: 0, offscreen: 0
+      stops: 0, waitSum: 0, waitCount: 0, offscreen: 0
     };
 
     this.history = [];      // для графиков: { hour, queue, load }
     this.historyTick = 0;
+  }
+
+  /**
+   * Включить или выключить техническую часть.
+   *
+   * Счётчики сбрасываются: смешивать остановки двух режимов в одной
+   * сумме нельзя — получится средняя температура по палате. Время суток
+   * и люди в холле остаются на месте, чтобы разницу было видно сразу.
+   */
+  setSystem(on) {
+    if (this.systemOn === on) return;
+    this.systemOn = on;
+
+    this.stats.passes = 0;
+    this.stats.wrongPasses = 0;
+    this.stats.uselessStops = 0;
+    this.stats.stops = 0;
+    this.stats.served = 0;
+    this.stats.toStairs = 0;
+    this.stats.waitSum = 0;
+    this.stats.waitCount = 0;
+    this.stats.avgWait = 0;
+    this.modeSince = this.time;
+
+    for (const lift of this.elevators) lift.lastDecision = 'stop';
+  }
+
+  /** Сколько модельных минут работает текущий режим. */
+  get modeMinutes() {
+    return Math.max(0, (this.time - (this.modeSince ?? this.time)) / 60);
   }
 
   /** Перемотка на сценарий: «Утро», «Обед», «После пар». */
@@ -241,9 +291,10 @@ export class Simulator {
 
     if (person.body) {
       const slot = hallSlot(best.number, index);
+      const door = doorFacing(best.number);
       person.body.walkPath(
         [{ x: ENTRANCE_IN.x, z: ENTRANCE_IN.z }, { x: slot.x, z: slot.z }],
-        () => { person.state = 'wait'; person.body.faceTo(liftX(best.number), HALL.liftWall); }
+        () => { person.state = 'wait'; person.body.faceTo(door.x, door.z); }
       );
     } else {
       person.state = 'wait';
@@ -270,10 +321,11 @@ export class Simulator {
     };
 
     const index = list.length;
-    if (index < 4) {
-      const x = liftX(number) + (index - 1.5) * 0.55;
-      const z = HALL.liftWall + HALL.landingDepth * 0.6;
-      person.body = this.crowd.spawn(x, floorY(floor), z, { x, z: HALL.liftWall });
+    if (index < LANDING_SLOTS) {
+      const slot = landingSlot(number, index);
+      person.body = this.crowd.spawn(
+        slot.x, floorY(floor), slot.z, doorFacing(number)
+      );
     }
     if (!person.body) this.stats.offscreen += 1;
 
@@ -295,8 +347,9 @@ export class Simulator {
           person.slot = i;
           if (person.body && person.state === 'wait') {
             const slot = hallSlot(lift.number, i);
+            const door = doorFacing(lift.number);
             person.body.moveTo(slot.x, slot.z, () => {
-              person.body.faceTo(liftX(lift.number), HALL.liftWall);
+              person.body.faceTo(door.x, door.z);
             });
           }
         }
@@ -403,6 +456,8 @@ class LiftAgent {
     this.transfer = [];        // кто сейчас заходит или выходит
     this.transferTimer = 0;
     this.nextTransfer = 0;
+    this.direction = 1;          // куда кабина идёт сейчас: вверх
+    this.lastStopFloor = null;   // где створки уже открывались в этот приезд
     this.lift.lastDecision = 'stop';
   }
 
@@ -421,71 +476,170 @@ class LiftAgent {
 
     // Приехали — сперва выпускаем
     if (this.onboard.some((p) => p.to === lift.floor)) {
-      if (lift.openDoors()) this.#beginAlighting();
+      if (this.#open()) this.#beginAlighting();
       return;
     }
 
-    // На первом этаже сажаем очередь
-    if (lift.floor === 1) {
-      const queue = this.sim.queues.get(lift.number);
-      if (queue.length && this.onboard.length < this.capacity) {
-        if (lift.openDoors()) this.#beginBoarding(queue.people, 1);
-        return;
-      }
-    } else {
-      // На верхнем этаже подбираем тех, кто вызвал
-      const waiting = this.sim.upperWaiting.get(lift.floor);
-      if (waiting && waiting.length && this.onboard.length < this.capacity) {
-        if (lift.openDoors()) this.#beginBoarding(waiting, lift.floor);
-        return;
-      }
+    // Сажаем тех, кого можем взять на этом этаже
+    const boardable = this.#boardableHere();
+    if (this.#shouldOpenFor(boardable.length)) {
+      if (this.#open()) this.#beginBoarding(boardable, lift.floor);
+      return;
     }
 
     const next = this.#chooseNextFloor();
-    if (next !== null && next !== lift.floor) lift.moveTo(next);
+    if (next !== null && next !== lift.floor && lift.moveTo(next)) {
+      // Уехали — на новом этаже створки открывать снова можно
+      this.lastStopFloor = null;
+    }
+  }
+
+  /**
+   * Кого можно посадить на текущем этаже.
+   *
+   * Направление не спрашиваем. В корпусе 7 на этаже одна кнопка вызова
+   * без стрелок — лифт приезжает на любой вызов, и кто успел, тот и зашёл,
+   * даже если ему потом ехать в другую сторону. Именно из этого и растёт
+   * задача проекта: кабина набивается до отказа и дальше возит сама себя.
+   */
+  #boardableHere() {
+    const lift = this.lift;
+
+    if (lift.floor === 1) return this.sim.queues.get(lift.number).people;
+    return this.sim.upperWaiting.get(lift.floor) || [];
+  }
+
+  /**
+   * Открывать ли створки на вызов с этого этажа.
+   *
+   * С технической частью — только если есть куда посадить: камера уже
+   * показала, что мест нет, и тормозить незачем. Без неё лифт тормозит
+   * на каждый вызов, и у полной кабины цикл дверей уходит впустую —
+   * семь секунд для всех, кто внутри, и для всех, кто ждёт выше.
+   */
+  #shouldOpenFor(waiting) {
+    if (!waiting) return false;
+
+    // На этом этаже створки уже открывались в этот приезд. Второй раз
+    // подряд лифт их не открывает — он уезжает, а вызов остаётся гореть
+    // и достаётся следующей кабине. Без этого полный лифт с невлезшей
+    // очередью перед носом открывался бы до конца дня.
+    if (this.lastStopFloor === this.lift.floor) return false;
+
+    if (this.onboard.length < this.capacity) return true;
+    return !this.sim.systemOn;
+  }
+
+  /** Открыть створки и засчитать остановку. */
+  #open() {
+    if (!this.lift.openDoors()) return false;
+    this.sim.stats.stops += 1;
+    return true;
   }
 
   // ---------- выбор следующего этажа ----------
 
   /**
-   * Куда ехать дальше.
+   * Куда ехать дальше — собирательное управление (алгоритм SCAN).
    *
-   * Кандидаты — этажи пассажиров в кабине и этажи, откуда поступил вызов.
-   * Для вызова (а не для высадки) спрашиваем модель: стоит ли вообще
-   * останавливаться. Если решено проехать — над дверью этого этажа
-   * загорается «Пропущено», и этаж из кандидатов на этот рейс выбывает.
+   * Так ездят настоящие лифты: кабина идёт в одну сторону, обслуживая
+   * всё по пути, и разворачивается, только когда впереди не осталось
+   * ни высадки, ни вызова. Нельзя, набрав полную кабину, вернуться
+   * вниз за новым вызовом — те, кто внутри, никуда не приедут.
+   *
+   * Сканируя этажи по ходу движения, кабина на каждом спрашивает:
+   *   • этаж заказан кем-то из пассажиров — останавливаемся всегда;
+   *   • на этаже ждут — решает техническая часть. Если она выключена,
+   *     останавливаемся тоже всегда, и дальше считайте сами, сколько
+   *     раз двери откроются впустую.
+   *
+   * Это та же последовательность, по которой считает рейс
+   * tech-model/06-simulation.js, — поэтому картинка на экране и числа
+   * в отчёте описывают одно и то же движение.
    */
   #chooseNextFloor() {
     const lift = this.lift;
 
     const drops = new Set(this.onboard.map((p) => p.to));
+    const calls = this.#callFloors();
+
+    let dir = this.direction || 1;
+
+    // Два захода: по ходу движения, потом в обратную сторону
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const last = this.#furthestAhead(drops, calls, dir);
+
+      if (last !== null) {
+        for (
+          let floor = lift.floor + dir;
+          dir > 0 ? floor <= last : floor >= last;
+          floor += dir
+        ) {
+          // За своими пассажирами едем всегда
+          if (drops.has(floor)) {
+            this.direction = dir;
+            return floor;
+          }
+
+          if (!calls.has(floor)) continue;
+
+          // Без технической части решение не принимается вовсе
+          if (!this.sim.systemOn) {
+            this.direction = dir;
+            return floor;
+          }
+
+          const verdict = decideCall(lift, this.sim.rng);
+
+          if (verdict.action === 'stop') {
+            this.direction = dir;
+            return floor;
+          }
+
+          // Проезжаем мимо: над дверью этого этажа загорается «Пропущено»
+          lift.flashSkip(floor);
+          this.sim.stats.passes += 1;
+          if (verdict.wrongPass) this.sim.stats.wrongPasses += 1;
+        }
+      }
+
+      dir = -dir;
+    }
+
+    // Делать нечего — возвращаемся вниз, там всегда кто-то появится
+    this.direction = -1;
+    return lift.floor === 1 ? null : 1;
+  }
+
+  /**
+   * Этажи, с которых поступил вызов.
+   *
+   * Кнопка на этаже одна и без стрелки, поэтому вызов не делится на
+   * «вверх» и «вниз»: кабина, идущая мимо, считается подходящей. Так
+   * устроена собирательная система управления в корпусе 7 — и так же
+   * считает рейс tech-model/06.
+   */
+  #callFloors() {
     const calls = new Set();
 
-    if (this.sim.queues.get(lift.number).length) calls.add(1);
+    if (this.sim.queues.get(this.lift.number).length) calls.add(1);
     for (const [floor, list] of this.sim.upperWaiting) {
       if (list.length) calls.add(floor);
     }
 
-    const candidates = [...new Set([...drops, ...calls])]
-      .filter((f) => f !== lift.floor)
-      .sort((a, b) => Math.abs(a - lift.floor) - Math.abs(b - lift.floor));
+    return calls;
+  }
 
-    for (const floor of candidates) {
-      // За своими пассажирами едем всегда
-      if (drops.has(floor)) return floor;
+  /** Самая дальняя цель по ходу движения; null — впереди пусто. */
+  #furthestAhead(drops, calls, dir) {
+    let best = null;
 
-      // Полная кабина — вызов можно и проехать
-      const verdict = decideCall(lift, this.sim.rng);
-
-      if (verdict.action === 'stop') return floor;
-
-      lift.flashSkip(floor);
-      this.sim.stats.passes += 1;
-      if (verdict.wrongPass) this.sim.stats.wrongPasses += 1;
+    for (const floor of [...drops, ...calls]) {
+      if ((floor - this.lift.floor) * dir <= 0) continue;
+      if (best === null || (floor - best) * dir > 0) best = floor;
     }
 
-    // Делать нечего — возвращаемся вниз, там всегда кто-то появится
-    return lift.floor === 1 ? null : 1;
+    return best;
   }
 
   // ---------- посадка и высадка ----------
@@ -502,9 +656,13 @@ class LiftAgent {
     const free = this.capacity - this.onboard.length;
     const ready = source.filter((p) => p.state === 'wait' || p.state === 'waitUpper');
 
+    // Створки открылись, а войти некому: та самая бесполезная остановка,
+    // от которой избавляет техническая часть.
+    if (free <= 0 && ready.length) this.sim.stats.uselessStops += 1;
+
     this.phase = 'boarding';
     this.boardFloor = floor;
-    this.transfer = ready.slice(0, free);
+    this.transfer = ready.slice(0, Math.max(0, free));
     this.transferTimer = 0;
     this.nextTransfer = 0;
     this.queueIndex = 0;
@@ -542,6 +700,7 @@ class LiftAgent {
     if (done) {
       this.phase = 'idle';
       this.transfer = [];
+      this.lastStopFloor = lift.floor;
       lift.closeDoors();
     }
   }
@@ -570,12 +729,13 @@ class LiftAgent {
     }
 
     const doorway = doorwaySlot(lift.number);
-    const cabinZ = lift.cabin.position.z;
+    // Место в кабине задано в её координатах; лифт переводит его в холл
+    const seat = lift.toWorld(slot.x, lift.cabin.position.z + slot.z);
 
     person.body.walkPath(
       [
         { x: doorway.x, z: doorway.z },
-        { x: liftX(lift.number) + slot.x, z: cabinZ + slot.z }
+        { x: seat.x, z: seat.z }
       ],
       () => {
         person.state = 'ride';
@@ -602,24 +762,28 @@ class LiftAgent {
     person.body.detachTo(this.sim.scene, world);
 
     if (lift.floor === 1) {
-      // Внизу — на выход из корпуса
+      // Внизу — через коридор на выход из корпуса
+      const out = frontOf(lift.number, 1.3);
+
       person.body.walkPath(
         [
-          { x: liftX(lift.number), y: 0, z: HALL.liftWall + 1.3 },
+          { x: out.x, y: 0, z: out.z },
           { x: ENTRANCE_IN.x, y: 0, z: ENTRANCE_IN.z },
           { x: ENTRANCE.x, y: 0, z: ENTRANCE.z }
         ],
         () => { person.state = 'done'; this.sim.crowd.release(person.body); }
       );
     } else {
-      // Наверху — на площадку и вглубь этажа
+      // Наверху — на площадку перед дверью и дальше по коридору этажа
       const y = floorY(lift.floor);
-      const side = person.id % 2 === 0 ? 1 : -1;
+      const away = person.id % 2 === 0 ? 1 : -1;
+      const step = frontOf(lift.number, 1.0);
+      const exit = frontOf(lift.number, 0.8, away * 3.2);
 
       person.body.walkPath(
         [
-          { x: liftX(lift.number), y, z: HALL.liftWall + 1.1 },
-          { x: liftX(lift.number) + side * 2.2, y, z: HALL.liftWall + HALL.landingDepth - 0.3 }
+          { x: step.x, y, z: step.z },
+          { x: exit.x, y, z: exit.z }
         ],
         () => { person.state = 'done'; this.sim.crowd.release(person.body); }
       );

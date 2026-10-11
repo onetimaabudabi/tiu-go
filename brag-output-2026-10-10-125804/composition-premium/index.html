@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ru" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>TIU GO — premium</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /*
+        Спортивно-рекламный монтаж: чистый чёрный, крупная прописная
+        типографика, жёсткие склейки точно по ударам (130 BPM, сетка снята
+        с самого трека). Никаких плавных перетеканий — в этом жанре кадр
+        меняется мгновенно, иначе теряется удар.
+
+        Цвета — из мини-приложения, чтобы ролик и продукт читались как одно
+        целое: акцентный синий и красный статуса взяты из style.css.
+      */
+      :root {
+        --ink: #000000;
+        --paper: #ffffff;
+        --red: #ef4444;
+        --blue: #5b8def;
+        --dim: #8b929b;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ink);
+      }
+
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink);
+        color: var(--paper);
+        font-family: system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- Типографика ---------- */
+
+      .huge {
+        font-size: 430px;
+        font-weight: 800;
+        line-height: 0.82;
+        letter-spacing: -0.045em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .big {
+        font-size: 168px;
+        font-weight: 800;
+        line-height: 0.95;
+        letter-spacing: -0.035em;
+        text-transform: uppercase;
+      }
+
+      .mid {
+        font-size: 96px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.025em;
+        text-transform: uppercase;
+      }
+
+      .small {
+        font-size: 44px;
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+
+      .tag {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+
+      .rule {
+        height: 3px;
+        background: var(--paper);
+      }
+
+      .shot {
+        position: absolute;
+        display: block;
+      }
+
+      /* ---------- Постоянные слои ---------- */
+
+      #vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at 50% 46%,
+          rgba(0, 0, 0, 0) 38%,
+          rgba(0, 0, 0, 0.55) 100%
+        );
+      }
+
+      #meta-left {
+        position: absolute;
+        left: 72px;
+        bottom: 56px;
+      }
+
+      #meta-right {
+        position: absolute;
+        right: 72px;
+        bottom: 56px;
+        text-align: right;
+      }
+
+      /* ---------- Сцена 1 ---------- */
+
+      #s1-wrap {
+        position: absolute;
+        left: 160px;
+        top: 300px;
+      }
+
+      #s1-sub {
+        margin-top: 24px;
+      }
+
+      /* ---------- Сцена 2 ---------- */
+
+      #s2-wrap {
+        position: absolute;
+        left: 160px;
+        top: 300px;
+      }
+
+      /* 13:05 — просто время, а не тревога: красный бережём для очереди */
+      #s2-num {
+        font-size: 300px;
+        letter-spacing: -0.05em;
+      }
+
+      #s2-sub {
+        margin-top: 24px;
+      }
+
+      /* ---------- Сцена 3: пауза в музыке ---------- */
+
+      #s3-wrap {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #s3-line {
+        font-size: 200px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        text-transform: uppercase;
+      }
+
+      #s3-rule {
+        width: 0;
+        margin-top: 46px;
+      }
+
+      #s3-sub {
+        margin-top: 44px;
+        color: var(--dim);
+      }
+
+      /* ---------- Сцена 4: дроп ---------- */
+
+      #s4-phone {
+        left: 196px;
+        top: -86px;
+        width: 578px;
+        height: 1251px;
+      }
+
+      #s4-col {
+        position: absolute;
+        left: 900px;
+        top: 330px;
+        width: 920px;
+      }
+
+      #s4-two {
+        margin-top: 28px;
+        color: var(--blue);
+      }
+
+      /* ---------- Сцена 5: очередь ---------- */
+
+      #s5-num {
+        position: absolute;
+        left: 150px;
+        top: 318px;
+        color: var(--red);
+      }
+
+      #s5-sub {
+        position: absolute;
+        left: 162px;
+        top: 718px;
+        width: 520px;
+      }
+
+      #s5-bar {
+        left: 760px;
+        top: 452px;
+        width: 1000px;
+        height: 159px;
+      }
+
+      /* ---------- Сцена 6: камера ---------- */
+
+      #s6-shot {
+        left: 0;
+        top: -2px;
+        width: 1920px;
+        height: 1084px;
+      }
+
+      /*
+        Кадр камеры режем по горизонтали: сверху картинка, снизу чистая
+        чёрная плашка под текст. Накладывать крупный шрифт прямо на рамки
+        детекции нельзя — читаются оба слоя плохо.
+      */
+      #s6-band {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 392px;
+        background: var(--ink);
+      }
+
+      #s6-scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 392px;
+        height: 150px;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 1));
+      }
+
+      #s6-col {
+        position: absolute;
+        left: 140px;
+        bottom: 92px;
+        width: 1500px;
+        display: flex;
+        align-items: baseline;
+        gap: 36px;
+      }
+
+      /* ---------- Сцена 7: ответ ---------- */
+
+      #s7-card {
+        left: 912px;
+        top: 196px;
+        width: 940px;
+        height: 690px;
+      }
+
+      #s7-col {
+        position: absolute;
+        left: 140px;
+        top: 318px;
+        width: 740px;
+      }
+
+      /* Колонка узкая — крупный кегль здесь свой, иначе строка
+         заезжает под карточку сравнения. */
+      #s7-col .big {
+        font-size: 126px;
+      }
+
+      #s7-col .small {
+        font-size: 38px;
+      }
+
+      #s7-accent {
+        color: var(--blue);
+      }
+
+      #s7-note {
+        margin-top: 34px;
+      }
+
+      /* ---------- Сцена 8: лок-ап ---------- */
+
+      #s8-wrap {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #s8-brand {
+        font-size: 264px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.02em;
+      }
+
+      #s8-rule {
+        width: 0;
+        margin-top: 40px;
+      }
+
+      #s8-line {
+        margin-top: 40px;
+        font-size: 56px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        text-transform: uppercase;
+      }
+
+      #s8-where {
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="22.4"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- ========== Сцена 1: 16 этажей (0 → 2.00) ========== -->
+      <section id="s1" class="clip" data-start="0" data-duration="2" data-track-index="2">
+        <div id="s1-wrap">
+          <div class="huge" id="s1-num">16</div>
+          <div class="big" id="s1-sub">этажей</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 2: обеденный пик (2.00 → 4.08) ========== -->
+      <section id="s2" class="clip" data-start="2" data-duration="2.08" data-track-index="2">
+        <div id="s2-wrap">
+          <div class="huge" id="s2-num">13:05</div>
+          <div class="big" id="s2-sub">обед</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 3: пауза (4.08 → 8.46) ========== -->
+      <section id="s3" class="clip" data-start="4.08" data-duration="4.38" data-track-index="2">
+        <div id="s3-wrap">
+          <div id="s3-line">Сколько ждать?</div>
+          <div class="rule" id="s3-rule"></div>
+          <div class="mid" id="s3-sub">Узнаешь внизу</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 4: дроп (8.46 → 11.92) ========== -->
+      <section id="s4" class="clip" data-start="8.46" data-duration="3.46" data-track-index="2">
+        <img id="s4-phone" class="shot" src="assets/media/app-main.png" alt="" />
+        <div id="s4-col">
+          <div class="big" id="s4-one">Не угадывай</div>
+          <div class="big" id="s4-two">Смотри</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 5: очередь (11.92 → 14.69) ========== -->
+      <section id="s5" class="clip" data-start="11.92" data-duration="2.77" data-track-index="2">
+        <div class="huge" id="s5-num">22</div>
+        <div class="mid" id="s5-sub">человека внизу</div>
+        <img id="s5-bar" class="shot" src="assets/media/app-floorbar.png" alt="" />
+      </section>
+
+      <!-- ========== Сцена 6: камера (14.69 → 17.92) ========== -->
+      <section id="s6" class="clip" data-start="14.69" data-duration="3.23" data-track-index="2">
+        <img id="s6-shot" class="shot" src="assets/media/app-camera.png" alt="" />
+        <div id="s6-scrim"></div>
+        <div id="s6-band"></div>
+        <div id="s6-col">
+          <div class="big" id="s6-one">Камера</div>
+          <div class="big" id="s6-two">считает очередь</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 7: ответ (17.92 → 20.23) ========== -->
+      <section id="s7" class="clip" data-start="17.92" data-duration="2.31" data-track-index="2">
+        <img id="s7-card" class="shot" src="assets/media/app-compare.png" alt="" />
+        <div id="s7-col">
+          <div class="big" id="s7-accent">Лифт</div>
+          <div class="big" id="s7-fast">быстрее</div>
+          <div class="small" id="s7-note">на 1 мин 9 сек</div>
+        </div>
+      </section>
+
+      <!-- ========== Сцена 8: лок-ап (20.23 → 22.40) ========== -->
+      <section id="s8" class="clip" data-start="20.23" data-duration="2.17" data-track-index="2">
+        <div id="s8-wrap">
+          <div id="s8-brand">TIU GO</div>
+          <div class="rule" id="s8-rule"></div>
+          <div id="s8-line">Ждать или идти по лестнице</div>
+          <div class="tag" id="s8-where">Telegram · MAX</div>
+        </div>
+      </section>
+
+      <!-- ========== Постоянные слои ========== -->
+      <div id="vignette"></div>
+      <div class="tag" id="meta-left">ТИУ · Корпус 7</div>
+      <div class="tag" id="meta-right">Мельникайте 70</div>
+
+      <!-- ========== Звук ========== -->
+      <audio
+        id="bgm"
+        src="assets/music/drive.mp3"
+        data-start="0"
+        data-duration="22.4"
+        data-track-index="5"
+        data-volume="1"
+      ></audio>
+
+      <!-- Единственный акцент — на дропе. Трек и так плотный. -->
+      <audio
+        id="sfx-drop"
+        src="assets/sfx/impactSoft_heavy_002.ogg"
+        data-start="8.46"
+        data-duration="0.57"
+        data-track-index="6"
+        data-volume="0.22"
+      ></audio>
+    </div>
+
+    <script>
+      /*
+        Сетка ударов снята с самого трека:
+        npx hyperframes beats → beats/assets/music/drive.mp3.json
+        130 BPM, доля 0.2308 с. Все границы сцен и появления текста стоят
+        ровно на её точках — ни одна цифра здесь не выбрана на глаз.
+
+        Карта энергии трека (окно 109.5–131.9 с исходника):
+          0.0–3.5  — средний уровень, вступление
+          4.0–7.5  — провал до −22 дБ, пауза
+          8.46     — дроп, дальше ровный драйв до конца
+        Монтаж повторяет эту форму: утверждение → пауза → продукт.
+      */
+      const tl = gsap.timeline({ paused: true });
+
+      // Жёсткий удар типографики: короткий, с перелётом снизу
+      const SLAM = { duration: 0.18, ease: "power4.out" };
+
+      function slam(target, at, from = 120) {
+        tl.fromTo(target, { y: from, opacity: 0 }, { y: 0, opacity: 1, ...SLAM }, at);
+      }
+
+      // ---------- Сцена 1 ----------
+      // beat-locked: 0.15 — первая доля окна
+      slam("#s1-num", 0.15, 160);
+      slam("#s1-sub", 0.61, 80); // beat-grid
+
+      // ---------- Сцена 2 ----------
+      // beat-locked: 2.00 — жёсткая склейка
+      slam("#s2-num", 2.0, 160);
+      slam("#s2-sub", 2.46, 80); // beat-grid
+
+      // ---------- Сцена 3: музыка уходит в паузу ----------
+      // Здесь всё медленнее: трек стихает, кадр должен дышать.
+      tl.fromTo("#s3-line", { opacity: 0, y: 60 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 4.08);
+      tl.fromTo("#s3-rule", { width: 0 },
+        { width: 520, duration: 1.2, ease: "power2.inOut" }, 4.77); // beat-grid
+      tl.fromTo("#s3-sub", { opacity: 0 },
+        { opacity: 1, duration: 0.6, ease: "power2.out" }, 6.61);   // beat-grid
+      // Последняя доля перед дропом: кадр гаснет в ноль, чтобы удар был чище
+      tl.to("#s3-wrap", { opacity: 0, duration: 0.22, ease: "power2.in" }, 8.0);
+
+      // ---------- Сцена 4: дроп ----------
+      // beat-locked: 8.46 — вступление ударных, самый сильный переход ролика
+      tl.fromTo("#s4-phone", { scale: 1.14, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.42, ease: "power4.out" }, 8.46);
+      slam("#s4-one", 8.46, 140);
+      slam("#s4-two", 10.54, 140); // beat-locked: сильная доля 0.94
+
+      // ---------- Сцена 5: очередь ----------
+      // beat-locked: 11.92
+      slam("#s5-num", 11.92, 150);
+      slam("#s5-sub", 12.61, 70); // beat-grid
+      tl.fromTo("#s5-bar", { clipPath: "inset(0 100% 0 0)" },
+        { clipPath: "inset(0 0% 0 0)", duration: 0.34, ease: "power3.out" }, 12.15);
+
+      // ---------- Сцена 6: камера ----------
+      // beat-locked: 14.69
+      tl.fromTo("#s6-shot", { scale: 1.1 },
+        { scale: 1, duration: 3.23, ease: "none" }, 14.69);
+      tl.fromTo("#s6-shot", { opacity: 0 },
+        { opacity: 1, duration: 0.2, ease: "power2.out" }, 14.69);
+      slam("#s6-one", 15.15, 90);  // beat-grid
+      slam("#s6-two", 16.31, 90);  // beat-grid
+
+      // ---------- Сцена 7: ответ ----------
+      // beat-locked: 17.92 — самая сильная доля трека (strength 1.00)
+      tl.fromTo("#s7-card", { x: 90, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.34, ease: "power4.out" }, 17.92);
+      slam("#s7-accent", 17.92, 110);
+      slam("#s7-fast", 18.38, 110);   // beat-grid
+      tl.fromTo("#s7-note", { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: "power2.out" }, 19.07); // beat-grid
+
+      // ---------- Сцена 8: лок-ап ----------
+      // beat-locked: 20.23
+      tl.fromTo("#s8-brand", { scale: 1.08, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.3, ease: "power4.out" }, 20.23);
+      tl.fromTo("#s8-rule", { width: 0 },
+        { width: 760, duration: 0.5, ease: "power3.out" }, 20.69); // beat-grid
+      tl.fromTo("#s8-line", { y: 40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.28, ease: "power4.out" }, 20.92); // сильная доля
+      tl.fromTo("#s8-where", { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.out" }, 21.61); // сильная доля 0.95
+
+      // ---------- Постоянные слои ----------
+      // Угловые подписи появляются после вступления и уходят на лок-апе:
+      // в финале кадр должен остаться с одним брендом.
+      tl.fromTo(["#meta-left", "#meta-right"], { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.84);
+      tl.to(["#meta-left", "#meta-right"], { opacity: 0, duration: 0.25, ease: "power2.in" }, 20.23);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

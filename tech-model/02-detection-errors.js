@@ -218,6 +218,64 @@ function measurementDistribution(n, trials = TRIALS, opts) {
   };
 }
 
+// ---------- Табулированное распределение показаний ----------
+
+/**
+ * Распределение показаний камеры для каждой реальной загрузки кабины,
+ * в кумулятивном виде: table[n][d] — вероятность, что камера покажет
+ * не больше d человек, когда в кабине их ровно n.
+ *
+ * Зачем таблица. Прямой розыгрыш камеры — это n × 30 бросков на каждое
+ * решение. Симуляция дня принимает тысячи решений, прогонов 500, и прямой
+ * путь обошёлся бы в сотни миллионов бросков. Распределение не зависит
+ * от хода дня, поэтому считается один раз, а дальше из него делается
+ * выборка. Статистически это то же самое.
+ *
+ * Той же таблицей пользуется 3D-визуализация: Vite забирает её отсюда
+ * (через output/data/02-errors.json) и отдаёт в браузер, чтобы сравнение
+ * режимов на экране считалось по той же камере, что и отчёт.
+ *
+ * @param {number} capacity  вместимость кабины; таблица строится до capacity + 3
+ * @param {number} [trials]  сколько раз разыграть каждую загрузку
+ * @param {object} [opts]    параметры детектора для measure()
+ */
+function measurementTable(capacity, trials = TRIALS, opts) {
+  const table = [];
+
+  for (let n = 0; n <= capacity + 3; n += 1) {
+    const rng = io.makeRng(PARAMS.simulation.randomSeed + n * 7919);
+    const counts = new Array(n + 6).fill(0);
+
+    for (let i = 0; i < trials; i += 1) {
+      const d = Math.min(measure(n, rng, opts).tracked, counts.length - 1);
+      counts[d] += 1;
+    }
+
+    // Переводим в кумулятивные доли — по ним удобно делать выборку
+    const cumulative = [];
+    let acc = 0;
+    counts.forEach((c) => {
+      acc += c / trials;
+      cumulative.push(acc);
+    });
+
+    table.push(cumulative);
+  }
+
+  return table;
+}
+
+/** Выборка показаний камеры при реальной загрузке n по готовой таблице. */
+function sampleFromTable(table, n, rng) {
+  const row = table[Math.min(n, table.length - 1)];
+  const u = rng();
+
+  for (let d = 0; d < row.length; d += 1) {
+    if (u <= row[d]) return d;
+  }
+  return row.length - 1;
+}
+
 // ---------- Матрица ошибок для решения «полный / не полный» ----------
 
 /**
@@ -512,7 +570,13 @@ async function run() {
     focus,
     matrix: { TP: matrix.TP, FN: matrix.FN, FP: matrix.FP, TN: matrix.TN, accuracy: matrix.accuracy },
     errorOver10Percent: firstBad ? firstBad.people : null,
-    errorOver5PercentAt: over5
+    errorOver5PercentAt: over5,
+
+    // Кумулятивное распределение показаний камеры по загрузке кабины.
+    // Его читают симуляция дня (06) и 3D-визуализация — чтобы камера
+    // в отчёте и камера на экране были одной и той же камерой.
+    measurementTable: measurementTable(capacity),
+    measurementTableTrials: TRIALS
   };
 
   io.saveData('02-errors', result);
@@ -527,7 +591,8 @@ async function run() {
 module.exports = {
   rates, occludedShare, systematicMissRate, flickerRate, falsePositiveRate,
   measure, measurementDistribution, confusionAt, confusionMatrix,
-  FRAMES_PER_WINDOW, TRACK_MIN_HITS, run
+  measurementTable, sampleFromTable,
+  FRAMES_PER_WINDOW, TRACK_MIN_HITS, TRIALS, run
 };
 
 if (require.main === module) {

@@ -661,9 +661,9 @@ function buildDocument(R) {
     tableCaption('Поток людей'),
     table(['Параметр', 'Значение'], [
       ['Студентов / сотрудников', `${PARAMS.people.students} / ${PARAMS.people.staff}`],
-      ['Поездок на человека за день', PARAMS.simulation.tripsPerPersonPerDay],
+      ['Поездок на человека за день', PARAMS.people.tripsPerPersonPerDay],
       ['Всего поездок за день', sim.plan.total],
-      ['Доля поездок с первого этажа', pct(PARAMS.simulation.lobbyShare, 0)],
+      ['Доля поездок с первого этажа', pct(PARAMS.people.lobbyShare, 0)],
       ['Средний вес человека, кг', PARAMS.people.avgWeightKg],
       ['Прогонов симуляции', PARAMS.simulation.runs],
       ['Зерно генератора', PARAMS.simulation.randomSeed]

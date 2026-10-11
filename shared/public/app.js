@@ -25,6 +25,7 @@
   var DEST_KEY = 'tiu-go-destination';
   var CACHE_KEY = 'tiu-go-cache';
   var NOTIF_KEY = 'tiu-go-notifications';
+  var HAPTICS_KEY = 'tiu-go-haptics';
 
   var THEME_BG = { dark: '#0B0D12', light: '#F7F8FA' };
 
@@ -34,6 +35,10 @@
 
   // Причины жалобы: ключ уходит на сервер, подпись берётся из словаря
   var REPORT_REASONS = ['broken', 'slow', 'noise', 'dirty', 'other'];
+
+  // Сколько заглушек показывать, пока грузятся карточки. Шесть — столько
+  // же, сколько лифтов в корпусе: сетка не прыгнет, когда придут данные.
+  var SKELETON_TILES = 6;
 
   // Типы уведомлений: порядок задаёт порядок чекбоксов в настройках
   var NOTIFY_TYPES = ['crowd', 'arriving', 'peak', 'broken', 'full'];
@@ -66,13 +71,17 @@
     loaded: false,  // пришли ли данные хотя бы раз
     failed: false,  // последний запрос не удался и кэша не нашлось
     fromCache: false,
-    cachedAt: null
+    cachedAt: null,
+    forecast: null,     // прогноз по холлу: очередь через 5 и 10 минут
+    channelUrl: null,   // ссылка на канал проекта из .env
+    appUrl: null        // публичный адрес мини-аппа — для ссылки в «поделиться»
   };
 
   var lang = I18N.DEFAULT;
   var destination = 1;
   var favorites = []; // id избранных лифтов
   var notifications = null; // настройки уведомлений, см. readNotifications()
+  var haptics = false;      // вибрация при событиях, см. readHaptics()
 
   var prevFloors = {};   // id лифта -> этаж на прошлом обновлении
   var directions = {};   // id лифта -> 'up' | 'down' | 'idle'
@@ -83,6 +92,11 @@
   var toastTimer = null;
   var reportReason = null;
   var openSheetNode = null;  // какая из нижних модалок сейчас открыта
+  var shareText = '';        // текст, который уйдёт из модалки «поделиться»
+  var prevWait = {};         // id лифта -> прогноз ожидания на прошлом обновлении
+  var prevWork = {};         // id лифта -> статус работы на прошлом обновлении
+  var pendingOpenId = null;  // лифт из ссылки вида #lift-3, пока данных нет
+  var detailParts = [];      // блоки экрана лифта, которые прячет заглушка
 
   // ---------- DOM ----------
   var $ = function (id) { return document.getElementById(id); };
@@ -104,6 +118,13 @@
     floorbarIcon: $('floorbar-icon'),
     floorbarText: $('floorbar-text'),
     floorbarHint: $('floorbar-hint'),
+    forecastLine: $('forecast-line'),
+    forecastIcon: $('forecast-icon'),
+    forecastText: $('forecast-text'),
+    channelOpen: $('channel-open'),
+    channelPromo: $('channel-promo'),
+    channelButton: $('channel-button'),
+    plannerLink: $('planner-link'),
     themeColor: $('theme-color'),
     home: $('screen-home'),
     detail: $('screen-detail'),
@@ -163,6 +184,23 @@
     notifThresholdLabel: $('notif-threshold-label'),
     notifSave: $('notif-save'),
     notifCancel: $('notif-cancel'),
+    hapticsRow: $('haptics-row'),
+    hapticsHint: $('haptics-hint'),
+    hapticsInput: $('notif-haptics'),
+    detailSkeleton: $('detail-skeleton'),
+    dForecast: $('d-forecast'),
+    dForecastCard: $('d-forecast-card'),
+    dForecastWarmup: $('d-forecast-warmup'),
+    dForecastTrend: $('d-forecast-trend'),
+    ring: $('d-ring'),
+    ringArc: $('d-ring-arc'),
+    ringCount: $('d-countdown'),
+    ringState: $('d-ring-state'),
+    shareOpen: $('share-open'),
+    shareSheet: $('share-sheet'),
+    sharePreview: $('share-preview'),
+    shareActions: $('share-actions'),
+    shareCancel: $('share-cancel'),
     toast: $('toast')
   };
 
@@ -315,6 +353,53 @@
     if (host && host.HapticFeedback && host.HapticFeedback.impactOccurred) {
       try { host.HapticFeedback.impactOccurred('light'); } catch (e) {}
     }
+  }
+
+  // ---------- Вибрация ----------
+  //
+  // Отдельный слой от haptic(): тот просит клиент Telegram или MAX дать
+  // лёгкий отклик на тап, а здесь — настоящая вибрация устройства на
+  // события лифта. По умолчанию выключена: непрошеная вибрация в кармане
+  // раздражает сильнее, чем помогает.
+
+  // Рисунки вибрации: число — одиночный импульс, массив — серия
+  // «вибрация, пауза, вибрация».
+  var BUZZ = {
+    approaching: 100,                       // кабина подходит
+    arrived: [100, 50, 100],                // прогноз истёк, лифт должен быть здесь
+    broken: [200, 100, 200, 100, 200],      // лифт перестал работать
+    alert: 150                              // в холле собралась толпа
+  };
+
+  function hapticsSupported() {
+    return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+  }
+
+  function readHaptics() {
+    try {
+      return window.localStorage.getItem(HAPTICS_KEY) === 'on';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function saveHaptics(enabled) {
+    haptics = enabled;
+    try {
+      window.localStorage.setItem(HAPTICS_KEY, enabled ? 'on' : 'off');
+    } catch (e) {}
+  }
+
+  /**
+   * Вибрация по событию. Молчим, если выключено, не поддерживается или
+   * окно спрятано: вибрировать в свёрнутом приложении — худшее, что
+   * можно сделать с чужим телефоном.
+   */
+  function buzz(pattern) {
+    if (!haptics || !hapticsSupported()) return;
+    if (document.hidden) return;
+
+    try { navigator.vibrate(pattern); } catch (e) {}
   }
 
   // ---------- Тема ----------
@@ -1069,8 +1154,15 @@
   function updateHomeView() {
     var hasData = state.elevators.length > 0;
     var firstLoad = !state.loaded && !state.failed;
+    var showSkeleton = firstLoad && !hasData;
 
-    el.skeleton.hidden = !(firstLoad && !hasData);
+    // Заглушки собираем один раз: при каждой перерисовке анимация
+    // пульсации начиналась бы заново и моргала
+    if (showSkeleton && !el.skeleton.childElementCount) {
+      renderSkeleton(el.skeleton, SKELETON_TILES);
+    }
+
+    el.skeleton.hidden = !showSkeleton;
     el.grid.hidden = !hasData;
     el.empty.hidden = !(!hasData && !firstLoad);
 
@@ -1083,6 +1175,7 @@
     renderSummary();
     renderWorking();
     renderFloorBar();
+    renderForecastLine();
     pingOnFloorAlert();
     renderSysStatus();
 
@@ -1285,6 +1378,8 @@
     setText(el.detailSubtitle, state.address);
 
     renderDownPanel(lift);
+    renderForecastCard(lift);
+    syncRing(lift);
     if (!down) renderCamera(lift);
 
     if (down) {
@@ -1505,6 +1600,13 @@
     el.notifThreshold.value = notifications.threshold;
     renderThresholdLabel();
 
+    // Вибрация живёт отдельно от подписки: она работает и без ботов,
+    // поэтому приглушением её не накрываем и в подписку не отправляем
+    var canBuzz = hapticsSupported();
+    el.hapticsRow.hidden = !canBuzz;
+    el.hapticsHint.hidden = !canBuzz;
+    el.hapticsInput.checked = haptics;
+
     // Пока уведомления выключены, остальные поля приглушены
     el.notifScroll.classList.toggle('is-muted', !notifications.enabled);
   }
@@ -1633,9 +1735,444 @@
 
     if (level === 'full' && lastFloorLevel !== 'full') {
       playOnce(el.notifOpen.querySelector('.icon'), 'icon--swing', 700);
+      // То же событие, о котором бот присылает push, — только мы уже внутри
+      buzz(BUZZ.alert);
     }
 
     lastFloorLevel = level;
+  }
+
+  // ---------- Прогноз на 5 и 10 минут ----------
+
+  /**
+   * Строка тенденции на главном экране.
+   *
+   * Показываем её, только когда очередь действительно куда-то движется.
+   * Ровную очередь объявлять новостью незачем — строка просто исчезает,
+   * и экран остаётся спокойным.
+   */
+  function renderForecastLine() {
+    var forecast = state.forecast;
+    var next = forecast && forecast.in5min;
+
+    if (!state.loaded || !next || next.trend === 'stable') {
+      el.forecastLine.hidden = true;
+      return;
+    }
+
+    var growing = next.trend === 'growing';
+    var people = pl('detail.people', next.waiting);
+
+    el.forecastLine.dataset.trend = next.trend;
+    setIcon(el.forecastIcon, growing ? 'trend-up' : 'trend-down');
+    setText(el.forecastText, t(growing ? 'forecast.queueUp' : 'forecast.queueDown', {
+      n: next.waiting,
+      people: people
+    }));
+
+    el.forecastLine.hidden = false;
+  }
+
+  /** Строка карточки прогноза: когда — и что в этот момент будет. */
+  function forecastRow(when, occupancy, capacity, waiting, now) {
+    var row = document.createElement('div');
+    row.className = 'forecast__row' + (now ? ' forecast__row--now' : '');
+
+    var label = document.createElement('span');
+    label.className = 'forecast__when';
+    label.textContent = when;
+
+    var value = document.createElement('span');
+    value.className = 'forecast__value';
+    value.textContent =
+      t('forecast.cabin', { n: occupancy, capacity: capacity }) + ' · ' +
+      t('forecast.waiting', { n: waiting });
+
+    row.appendChild(label);
+    row.appendChild(value);
+    return row;
+  }
+
+  /**
+   * Карточка «Прогноз» на экране лифта: что сейчас, что через пять
+   * и через десять минут. Пока наблюдений мало, честно говорим об этом
+   * вместо того, чтобы показывать экстраполяцию двух точек.
+   */
+  function renderForecastCard(lift) {
+    var forecast = lift && lift.forecast;
+    var down = isDown(lift);
+
+    el.dForecastCard.hidden = down;
+    if (down) return;
+
+    var ready = forecast && forecast.in5min && forecast.samples >= 3;
+
+    el.dForecast.hidden = !ready;
+    el.dForecastWarmup.hidden = ready;
+
+    if (!ready) {
+      el.dForecastTrend.hidden = true;
+      return;
+    }
+
+    el.dForecast.replaceChildren(
+      forecastRow(t('forecast.now'), lift.occupancy, lift.capacity,
+        lift.waitingFirstFloor, true),
+      forecastRow(t('forecast.in5'), forecast.in5min.occupancy, lift.capacity,
+        forecast.in5min.waiting, false),
+      forecastRow(t('forecast.in10'), forecast.in10min.occupancy, lift.capacity,
+        forecast.in10min.waiting, false)
+    );
+
+    // Стрелка у заголовка: куда идёт очередь к этому лифту
+    var trend = forecast.in5min.trend;
+    el.dForecastTrend.hidden = trend === 'stable';
+    el.dForecastTrend.dataset.trend = trend;
+    setIcon(el.dForecastTrend, trend === 'falling' ? 'trend-down' : 'trend-up');
+  }
+
+  // ---------- Кольцо ожидания ----------
+  //
+  // Кольцо показывает не «сколько ждать», а «сколько уже ждёшь»: оно
+  // заполняется по мере того, как истекает прогноз, и в центре идёт
+  // обратный отсчёт.
+  //
+  // Про перезапуск. Данные приходят раз в три секунды, и прогноз в них
+  // каждый раз чуть-чуть другой. Если сбрасывать кольцо на каждое
+  // обновление, отсчёт не сдвинется с места никогда. Поэтому сбрасываем
+  // только при заметном изменении прогноза — иначе кольцо продолжает
+  // идти, а новая оценка просто меняет подпись рядом.
+
+  var RING_LENGTH = 213.6;        // длина окружности при r = 34
+  var RING_RESET_SHARE = 0.25;    // на сколько должен измениться прогноз
+  var RING_LATE_SHARE = 1.5;      // во сколько раз превышен прогноз
+
+  var ring = {
+    liftId: null,
+    total: 0,        // прогноз, от которого идёт отсчёт, с
+    startedAt: 0,
+    state: 'idle',
+    raf: null
+  };
+
+  function stopRing() {
+    if (ring.raf) {
+      window.cancelAnimationFrame(ring.raf);
+      ring.raf = null;
+    }
+  }
+
+  function startRing(liftId, seconds) {
+    ring.liftId = liftId;
+    ring.total = Math.max(seconds, 1);
+    ring.startedAt = Date.now();
+    ring.state = 'run';
+    drawRing();
+  }
+
+  /** Один кадр кольца. Сам себя перезапускает, пока экран лифта открыт. */
+  function drawRing() {
+    stopRing();
+
+    if (state.openId === null || ring.state === 'idle' || !ring.total) return;
+
+    var elapsed = (Date.now() - ring.startedAt) / 1000;
+    var share = elapsed / ring.total;
+    var left = Math.max(Math.ceil(ring.total - elapsed), 0);
+
+    var next = 'run';
+    if (share >= RING_LATE_SHARE) next = 'late';
+    else if (share >= 1) next = 'done';
+
+    // Переход «идёт» → «приехал» — то самое событие, ради которого
+    // человек и держит экран открытым
+    if (next !== ring.state && next === 'done') buzz(BUZZ.arrived);
+    ring.state = next;
+
+    el.ring.dataset.state = next;
+    el.ringArc.style.strokeDashoffset = RING_LENGTH * (1 - Math.min(share, 1));
+    setText(el.ringCount, next === 'run' ? String(left) : '0');
+
+    var note = '';
+    if (next === 'done') note = t('ring.arrived');
+    else if (next === 'late') note = t('ring.late');
+
+    el.ringState.hidden = !note;
+    if (note) setText(el.ringState, note);
+
+    ring.raf = window.requestAnimationFrame(drawRing);
+  }
+
+  /** Сверяет кольцо со свежим прогнозом выбранного лифта. */
+  function syncRing(lift) {
+    if (isDown(lift) || lift.waitTime === null) {
+      stopRing();
+      ring.state = 'idle';
+      ring.liftId = null;
+      el.ring.dataset.state = 'idle';
+      el.ringArc.style.strokeDashoffset = RING_LENGTH;
+      setText(el.ringCount, '—');
+      el.ringState.hidden = true;
+      return;
+    }
+
+    var fresh = lift.waitTime;
+    var changed = ring.total
+      ? Math.abs(fresh - ring.total) / ring.total > RING_RESET_SHARE
+      : true;
+
+    // Новый лифт, первый запуск или заметно другой прогноз — начинаем заново
+    if (ring.liftId !== lift.id || ring.state === 'idle' || changed) {
+      startRing(lift.id, fresh);
+      return;
+    }
+
+    if (!ring.raf) drawRing();
+  }
+
+  // ---------- Заглушки загрузки ----------
+
+  /**
+   * Вставляет в контейнер count заглушек карточки лифта.
+   * Форма повторяет настоящую карточку: название, этаж, две строки
+   * статистики и таблетка рекомендации.
+   */
+  function renderSkeleton(container, count) {
+    var items = [];
+
+    for (var i = 0; i < count; i += 1) {
+      var tile = document.createElement('span');
+      tile.className = 'skeleton skeleton--tile';
+
+      for (var line = 0; line < 5; line += 1) {
+        var bar = document.createElement('span');
+        bar.className = 'skeleton__line';
+        tile.appendChild(bar);
+      }
+
+      items.push(tile);
+    }
+
+    container.replaceChildren.apply(container, items);
+  }
+
+  // ---------- Канал проекта ----------
+
+  function renderChannel() {
+    var has = !!state.channelUrl;
+
+    el.channelOpen.hidden = !has;
+    el.channelPromo.hidden = !has;
+  }
+
+  function openChannel() {
+    if (!state.channelUrl) {
+      showToast(t('subscribe.missing'));
+      return;
+    }
+
+    haptic();
+
+    var tg = tgApp();
+    // В Telegram канал открываем внутри клиента, а не в браузере
+    if (tg && tg.openTelegramLink && /^https:\/\/t\.me\//.test(state.channelUrl)) {
+      try {
+        tg.openTelegramLink(state.channelUrl);
+        return;
+      } catch (e) {}
+    }
+
+    var host = tg || maxApp();
+    if (host && host.openLink) {
+      try {
+        host.openLink(state.channelUrl);
+        return;
+      } catch (e) {}
+    }
+
+    window.open(state.channelUrl, '_blank', 'noopener');
+  }
+
+  // ---------- Поделиться статусом ----------
+
+  /** Ссылка на этот лифт: в ней открывается сразу экран детали. */
+  function liftLink(lift) {
+    var base = state.appUrl || (window.location.origin + window.location.pathname);
+    return base.replace(/[#?].*$/, '').replace(/\/$/, '/') + '#lift-' + lift.number;
+  }
+
+  /**
+   * Текст для отправки. Собирается из тех же строк, что и экран, —
+   * поэтому переводится вместе с интерфейсом и не расходится с тем,
+   * что человек видит перед собой.
+   */
+  function buildShareText(lift) {
+    var lines = [
+      '🛗 ' + t('share.head'),
+      elevatorName(lift) + ' · ' + state.address
+    ];
+
+    if (isDown(lift)) {
+      lines.push('');
+      lines.push('⚠ ' + t('share.broken'));
+      if (lift.statusNote) lines.push(lift.statusNote);
+    } else {
+      lines.push('');
+      lines.push(t('share.state', {
+        occupancy: lift.occupancy,
+        capacity: lift.capacity,
+        waiting: lift.waitingFirstFloor
+      }));
+      lines.push(t('share.wait', { wait: lift.waitRangeText || lift.waitTimeText || '—' }));
+      lines.push(t('share.rec', {
+        rec: t(lift.recommendation === 'stairs' ? 'pill.stairs' : 'pill.wait')
+      }));
+    }
+
+    lines.push('');
+    lines.push(t('share.updated', { time: formatClock(Date.now()) }));
+    lines.push(t('share.more', { url: liftLink(lift) }));
+
+    return lines.join('\n');
+  }
+
+  function copyShareText() {
+    var done = function () {
+      closeSheet();
+      showToast(t('share.copied'));
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareText).then(done, function () {
+        showToast(t('share.failed'));
+      });
+      return;
+    }
+
+    // Запасной путь для старых клиентов: временное поле и execCommand
+    try {
+      var area = document.createElement('textarea');
+      area.value = shareText;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand('copy');
+      document.body.removeChild(area);
+      done();
+    } catch (e) {
+      showToast(t('share.failed'));
+    }
+  }
+
+  function shareToTelegram(lift) {
+    var url = 'https://t.me/share/url?url=' + encodeURIComponent(liftLink(lift)) +
+      '&text=' + encodeURIComponent(shareText);
+
+    var tg = tgApp();
+    if (tg && tg.openTelegramLink) {
+      try {
+        tg.openTelegramLink(url);
+        closeSheet();
+        return;
+      } catch (e) {}
+    }
+
+    window.open(url, '_blank', 'noopener');
+    closeSheet();
+  }
+
+  /**
+   * Отправка в MAX. Своей схемы «поделиться» у клиента в документации
+   * нет, поэтому пробуем системное меню, а если и его нет — копируем
+   * текст. Молча ничего не делать было бы хуже всего.
+   */
+  function shareToMax() {
+    if (navigator.share) {
+      shareSystem();
+      return;
+    }
+    copyShareText();
+  }
+
+  function shareSystem() {
+    if (!navigator.share) {
+      copyShareText();
+      return;
+    }
+
+    navigator.share({ text: shareText })
+      .then(function () { closeSheet(); })
+      .catch(function () { /* человек передумал — это не ошибка */ });
+  }
+
+  /** Кнопки модалки собираются под возможности клиента. */
+  function buildShareActions(lift) {
+    var options = [
+      { key: 'share.copy', icon: 'copy', run: copyShareText },
+      { key: 'share.telegram', icon: 'telegram', run: function () { shareToTelegram(lift); } }
+    ];
+
+    if (maxApp()) options.push({ key: 'share.max', icon: 'share', run: shareToMax });
+    if (navigator.share) options.push({ key: 'share.system', icon: 'share', run: shareSystem });
+
+    var nodes = options.map(function (option) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button button--outline';
+      button.innerHTML = icon(option.icon) + '<span>' + t(option.key) + '</span>';
+      button.addEventListener('click', function () {
+        haptic();
+        option.run();
+      });
+      return button;
+    });
+
+    el.shareActions.replaceChildren.apply(el.shareActions, nodes);
+  }
+
+  function openShareSheet() {
+    var lift = findElevator(state.openId);
+    if (!lift) return;
+
+    shareText = buildShareText(lift);
+    setText(el.sharePreview, shareText);
+    buildShareActions(lift);
+    openSheet(el.shareSheet);
+  }
+
+  // ---------- События лифтов для вибрации ----------
+
+  // Полоса «кабина подходит»: от одной до двух минут до приезда
+  var ARRIVING_FROM = 60;
+  var ARRIVING_TO = 120;
+
+  /**
+   * Сравнивает свежие данные с прошлыми и отзывается вибрацией на
+   * три события: кабина подходит, лифт сломался, в холле собралась толпа.
+   * Приезд ловит кольцо — там видно точный момент.
+   */
+  function watchEvents() {
+    state.elevators.forEach(function (lift) {
+      var watched = lift.id === state.openId || isFavorite(lift.id);
+      var was = prevWait[lift.id];
+      var now = lift.waitTime;
+
+      // Кабина вошла в полосу «подходит» — раньше была дальше
+      if (watched && was !== undefined && now !== null &&
+          was > ARRIVING_TO && now <= ARRIVING_TO && now >= ARRIVING_FROM) {
+        buzz(BUZZ.approaching);
+      }
+
+      if (prevWork[lift.id] && prevWork[lift.id] !== 'broken' &&
+          lift.workStatus === 'broken') {
+        buzz(BUZZ.broken);
+      }
+
+      prevWait[lift.id] = now;
+      prevWork[lift.id] = lift.workStatus;
+    });
   }
 
   // ---------- Навигация ----------
@@ -1674,6 +2211,63 @@
     }
   }
 
+  /** Номер лифта из адреса вида index.html#lift-3, если он там есть. */
+  function readLiftHash() {
+    var match = /^#lift-(\d+)$/.exec(window.location.hash || '');
+    return match ? Number(match[1]) : null;
+  }
+
+  /**
+   * Режим ожидания на экране лифта: вместо содержимого — заглушки.
+   * Нужен ровно одному сценарию: человек открыл ссылку на конкретный
+   * лифт, экран уже виден, а данные ещё едут.
+   */
+  function setDetailLoading(loading) {
+    if (!detailParts.length) {
+      detailParts = Array.prototype.slice
+        .call(el.detail.querySelectorAll('.content > *'))
+        .filter(function (node) { return node !== el.detailSkeleton; });
+    }
+
+    el.detailSkeleton.hidden = !loading;
+    detailParts.forEach(function (node) {
+      // Плашку «лифт не работает» прячет своя логика — её не трогаем
+      if (node === el.detailDown && !loading) return;
+      node.hidden = loading;
+    });
+  }
+
+  /** Показывает экран лифта до прихода данных — по ссылке. */
+  function showDetailPlaceholder(number) {
+    el.home.hidden = true;
+    el.detail.hidden = false;
+    setDetailLoading(true);
+    setText(el.detailTitle, t('tile.elevatorName', { n: number }));
+    setText(el.detailSubtitle, '—');
+    toggleHostBackButton(true);
+  }
+
+  /** Как только данные пришли — открываем лифт, который ждали из ссылки. */
+  function openPendingLift() {
+    if (pendingOpenId === null) return;
+
+    var lift = state.elevators.filter(function (item) {
+      return item.number === pendingOpenId;
+    })[0];
+
+    if (!lift) {
+      // Такого номера нет — показываем обычный список
+      pendingOpenId = null;
+      setDetailLoading(false);
+      showHome();
+      return;
+    }
+
+    pendingOpenId = null;
+    setDetailLoading(false);
+    showDetail(lift.id);
+  }
+
   function showDetail(id) {
     state.openId = id;
 
@@ -1695,6 +2289,16 @@
 
   function showHome() {
     state.openId = null;
+    stopRing();
+
+    // Адрес с #lift-N оставлять нельзя: перезагрузка снова открыла бы лифт
+    if (window.location.hash) {
+      try {
+        window.history.replaceState(window.history.state, '',
+          window.location.pathname + window.location.search);
+      } catch (e) {}
+    }
+
     el.detail.hidden = true;
     el.home.hidden = false;
     window.scrollTo(0, 0);
@@ -1778,6 +2382,9 @@
     state.working = data.working === undefined ? state.total : data.working;
     state.cameraFloor = data.cameraFloor || state.cameraFloor;
     state.queueAtFirstFloor = data.queueAtFirstFloor || 0;
+    state.forecast = data.forecast || null;
+    state.channelUrl = data.channelUrl || null;
+    state.appUrl = data.appUrl || null;
 
     // Этажность приходит с сервера: ленты выбора этажа строятся по ней
     if (data.floors && data.floors !== state.floors) {
@@ -1786,6 +2393,9 @@
     }
 
     updateDirections(state.elevators);
+    openPendingLift();
+    renderChannel();
+    watchEvents();
   }
 
   function load() {
@@ -1989,12 +2599,53 @@
     }
   });
 
+  // Канал проекта: иконка в шапке и кнопка в настройках ведут в одно место
+  el.channelOpen.addEventListener('click', openChannel);
+  el.channelButton.addEventListener('click', openChannel);
+
+  // Планировщик — отдельная страница, ссылке хватает обычного перехода.
+  // Нужен только отклик на тап, как у остальных кнопок.
+  el.plannerLink.addEventListener('click', haptic);
+
+  // Вибрация: переключатель сохраняется сразу, не дожидаясь «Сохранить» —
+  // человек тут же чувствует результат
+  el.hapticsInput.addEventListener('change', function () {
+    saveHaptics(el.hapticsInput.checked);
+    if (haptics) buzz(BUZZ.approaching);
+  });
+
+  el.shareOpen.addEventListener('click', function () {
+    haptic();
+    openShareSheet();
+  });
+
+  el.shareCancel.addEventListener('click', closeSheet);
+
+  // Открытие лифта по ссылке в уже запущенном приложении
+  window.addEventListener('hashchange', function () {
+    var number = readLiftHash();
+    if (number === null) return;
+
+    var lift = state.elevators.filter(function (item) {
+      return item.number === number;
+    })[0];
+
+    if (lift) showDetail(lift.id);
+  });
+
   // ---------- Старт ----------
   function start() {
     lang = readStoredLang() || I18N.DEFAULT;
     favorites = readFavorites();
     destination = readDestination();
     notifications = readNotifications();
+    haptics = readHaptics();
+
+    // Ссылка вида index.html#lift-3 открывает сразу нужный лифт.
+    // Экран показываем немедленно — с заглушками, чтобы человек видел,
+    // что приложение откликнулось, а не ждал белого экрана.
+    pendingOpenId = readLiftHash();
+    if (pendingOpenId !== null) showDetailPlaceholder(pendingOpenId);
 
     initHost();
     renderNotifButton();

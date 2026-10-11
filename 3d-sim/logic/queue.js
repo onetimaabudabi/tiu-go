@@ -5,35 +5,40 @@
  * Места считаются один раз и не зависят от того, кто в очереди:
  * когда передний уходит, остальные просто получают новые координаты
  * и доходят до них пешком — никаких перескоков.
+ *
+ * Раскладка считается от двери своего лифта: четыре человека в ряд
+ * вдоль коридора, два ряда в глубину. Центральная полоса коридора
+ * остаётся свободной — по ней ходят те, кто вышел из лифта напротив,
+ * и те, кто идёт к дальним шахтам. Кому места в раскладке не хватило,
+ * тот стоит в модели и в статистике, но тела не получает: встречный
+ * коридор шириной 4,2 м физически не вмещает сотню человек, а честнее
+ * показать, сколько людей осталось за кадром, чем ставить их друг в друга.
  */
 
-import { CABIN, HALL, liftX } from './params.js';
+import { CABIN, liftAnchor, frontOf } from './params.js';
 
-// Раскладка в холле: три человека в ряд, ряды уходят от дверей в холл
-const COLS = 3;
-const COL_STEP = 0.46;
-const ROW_STEP = 0.62;
-const MAX_ROWS = 8;
+// Раскладка в холле. Четыре человека в ряд укладываются в шаг шахт
+// (2,1 м), три ряда — в половину ширины коридора: встречная очередь
+// стоит у своей стены, и между ними остаётся проход.
+const COLS = 4;          // человек в ряд вдоль коридора
+const COL_STEP = 0.52;   // шаг между соседями в ряду, м
+const ROWS = 3;          // рядов в глубину коридора
+const ROW_STEP = 0.5;    // шаг между рядами, м
+const FIRST_ROW = 0.85;  // отступ первого ряда от плоскости створок, м
 
 /** Где стоит человек с номером index в очереди к лифту number. */
 export function hallSlot(number, index) {
   const col = index % COLS;
-  const row = Math.floor(index / COLS);
-  const clampedRow = Math.min(row, MAX_ROWS - 1);
+  const row = Math.floor(index / COLS) % ROWS;
 
-  // Переполнение раскладываем вширь, а не бесконечно вглубь холла
-  const overflow = Math.max(0, row - (MAX_ROWS - 1));
-  const side = overflow % 2 === 0 ? 1 : -1;
-  const spread = Math.ceil(overflow / 2) * COL_STEP;
+  const lateral = (col - (COLS - 1) / 2) * COL_STEP;
+  const distance = FIRST_ROW + row * ROW_STEP;
 
-  return {
-    x: liftX(number) + (col - 1) * COL_STEP + side * spread,
-    z: HALL.waitZoneZ + clampedRow * ROW_STEP
-  };
+  return frontOf(number, distance, lateral);
 }
 
 /** Сколько человек помещается в видимую раскладку очереди. */
-export const VISIBLE_SLOTS = COLS * MAX_ROWS;
+export const VISIBLE_SLOTS = COLS * ROWS;
 
 /**
  * Место внутри кабины. Локальные координаты относительно центра пола:
@@ -55,10 +60,31 @@ export function cabinSlot(index, capacity) {
   };
 }
 
-/** Точка перед дверью, через которую человек входит и выходит. */
+/**
+ * Точка перед дверью, через которую человек входит и выходит.
+ * Створки узкие (900 мм), поэтому проход у всех один и тот же —
+ * ровно по оси шахты.
+ */
 export function doorwaySlot(number) {
-  return { x: liftX(number), z: HALL.liftWall + 0.55 };
+  return frontOf(number, 0.55);
 }
+
+/** Куда человек смотрит, стоя в очереди: на створки своего лифта. */
+export function doorFacing(number) {
+  const a = liftAnchor(number);
+  return { x: a.x, z: a.z };
+}
+
+// Площадка верхнего этажа: ожидающие стоят в метре от створок
+const LANDING_DISTANCE = 0.95;
+
+/** Место ожидающего на верхнем этаже: до четырёх человек у створок. */
+export function landingSlot(number, index) {
+  return frontOf(number, LANDING_DISTANCE, (index - 1.5) * 0.5);
+}
+
+/** Вместимость площадки верхнего этажа в видимых телах. */
+export const LANDING_SLOTS = 4;
 
 export class Queue {
   constructor(number) {

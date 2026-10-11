@@ -165,8 +165,13 @@ async function run(p = PARAMS) {
   console.log(`[queue] Критическая интенсивность λ* = ${nu.toFixed(4)} чел/с (${Math.round(nu * 3600)} чел/ч).`);
   console.log(`[queue] Вне пика λ = ${arrivalRate(11, p).toFixed(4)} — система устойчива (ρ = ${(arrivalRate(11, p) / nu).toFixed(2)}).`);
 
-  const morning = rows.find((r) => r.label.includes('08:20'));
-  console.log(`[queue] В утренний пик λ = ${morning.lambda.toFixed(3)} превышает λ* в ${(morning.lambda / nu).toFixed(1)} раза:`);
+  // Самый тяжёлый пик ищем по интенсивности, а не по подписи: подписи
+  // приходят из shared/params.json и меняются вместе с расписанием пар.
+  const peakRows = rows.filter((r) => r.label !== 'Вне пика');
+  const worst = peakRows.reduce((a, b) => (b.lambda > a.lambda ? b : a), peakRows[0]);
+
+  console.log(`[queue] В самый тяжёлый пик (${worst.label}) λ = ${worst.lambda.toFixed(3)} ` +
+    `превышает λ* в ${(worst.lambda / nu).toFixed(1)} раза:`);
   console.log('[queue] лифты физически не могут обслужить пик — часть потока обязана уйти на лестницу.');
 
   // График: Wq от λ

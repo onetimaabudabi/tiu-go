@@ -21,12 +21,18 @@
  */
 
 // ---------- Паспорт лифтов ----------
+//
+// Числа про сам объект приходят из shared/params.json — того же файла,
+// по которому считают обе математические модели. Здесь их не дублируем:
+// иначе приложение и модели опять начнут показывать разное.
+
+const params = require('../params.json');
 
 // Все лифты стоят в одном здании, поэтому адрес общий, а не свой у каждого.
-const ADDRESS = 'Корпус 7, Мельникайте 70';
+const ADDRESS = params.building.name;
 
 // Этажей в корпусе
-const FLOORS = 16;
+const FLOORS = params.building.floors;
 
 // Этаж, на котором стоят камеры. Он один на все лифты и вынесен
 // в константу, чтобы нигде не появилось «магической единицы».
@@ -39,16 +45,25 @@ const MAX_WAITING = 30;
 // Допустимые статусы работы лифта
 const STATUSES = ['working', 'broken', 'maintenance'];
 
-const ELEVATORS = [
-  // Корпус один и в нём 16 этажей, поэтому все лифты ходят на всю высоту.
-  // Камера у каждого лифта своя, но стоят они все на первом этаже.
-  { id: 1, number: 1, floors: FLOORS, capacity: 5 },
-  { id: 2, number: 2, floors: FLOORS, capacity: 5 },
-  { id: 3, number: 3, floors: FLOORS, capacity: 6 },
-  { id: 4, number: 4, floors: FLOORS, capacity: 4 },
-  { id: 5, number: 5, floors: FLOORS, capacity: 8 },
-  { id: 6, number: 6, floors: FLOORS, capacity: 6 }
-];
+// Вместимость показываем наблюдаемую пиковую, а не паспортную: в интерфейсе
+// важно, сколько людей реально набивается, а не что написано в табличке.
+const CAPACITY = params.elevators.capacityRealPeak;
+
+/** Статус лифта по спискам из общих параметров. */
+function statusOf(number) {
+  if (params.elevators.broken.includes(number)) return 'broken';
+  if (params.elevators.working.includes(number)) return 'working';
+  return 'maintenance';
+}
+
+// Корпус один и в нём 16 этажей, поэтому все лифты ходят на всю высоту.
+// Камера у каждого лифта своя, но стоят они все на первом этаже.
+const ELEVATORS = Array.from({ length: params.elevators.total }, (_, i) => ({
+  id: i + 1,
+  number: i + 1,
+  floors: FLOORS,
+  capacity: CAPACITY
+}));
 
 const TICK_MS = 3000; // данные обновляются раз в 3 секунды
 
@@ -77,8 +92,9 @@ function randomReadings(lift) {
 }
 
 const state = ELEVATORS.map((lift) => Object.assign({}, lift, randomReadings(lift), {
-  // Статус работы. По умолчанию все лифты на ходу.
-  status: 'working',
+  // Статус работы берём из общих параметров: в корпусе 7 сейчас
+  // три лифта из шести не работают.
+  status: statusOf(lift.number),
   statusNote: null,
 
   // Лифт, которому значения выставили руками из админки, замирает:
@@ -89,6 +105,40 @@ const state = ELEVATORS.map((lift) => Object.assign({}, lift, randomReadings(lif
 /** Работает ли лифт: сломанный и стоящий на обслуживании — нет. */
 function isWorking(lift) {
   return lift.status === 'working';
+}
+
+// ---------- Наплыв людей ----------
+//
+// Без этой волны очередь у каждого лифта — чистый шум: пришло двое, ушёл
+// один, и так по кругу. На таких данных прогноз на пять минут вперёд
+// показывал бы случайное число, а не тенденцию.
+//
+// В жизни поток общий для всего холла: закончилась пара — к лифтам идут
+// все сразу, через несколько минут наплыв спадает. Поэтому держим один
+// медленно плавающий множитель прихода, общий для всех шести лифтов.
+// Он меняется плавно (к цели смещаемся на 8 % за тик), а цель
+// переставляется в среднем раз в две минуты.
+
+const PRESSURE_MIN = 0.35;   // затишье посреди пары
+const PRESSURE_MAX = 2.6;    // перемена: люди идут потоком
+const PRESSURE_STEP = 0.08;  // доля пути к новой цели за один тик
+
+let pressure = 1;
+let pressureTarget = 1;
+
+/** Шаг волны наплыва. Вызывается раз в тик вместе с лифтами. */
+function tickPressure() {
+  // Новая цель примерно раз в две минуты (тик — 3 секунды)
+  if (Math.random() < 0.025) {
+    pressureTarget = PRESSURE_MIN + Math.random() * (PRESSURE_MAX - PRESSURE_MIN);
+  }
+
+  pressure += (pressureTarget - pressure) * PRESSURE_STEP;
+}
+
+/** Текущий множитель наплыва — его же показывает отладка симуляции. */
+function getPressure() {
+  return Number(pressure.toFixed(3));
 }
 
 /**
@@ -164,8 +214,8 @@ function tickElevator(lift) {
   // состояниях, а не висела в красном: типичная суммарная очередь по шести
   // лифтам — 5–12 человек (жёлтая зона), свободно бывает примерно треть
   // времени, большая очередь — редкое событие на перемене.
-  let arrive = Math.random() < 0.25 ? randInt(1, 2) : 0;
-  if (Math.random() < 0.05) arrive += randInt(2, 6); // перемена между парами — час пик
+  let arrive = Math.random() < 0.25 * pressure ? randInt(1, 2) : 0;
+  if (Math.random() < 0.05 * pressure) arrive += randInt(2, 6); // перемена между парами
 
   // Часть людей не дожидается и уходит по лестнице или к соседнему лифту,
   // поэтому очередь не растёт бесконечно.
@@ -179,6 +229,7 @@ function tickElevator(lift) {
 
 /** Один шаг симуляции для всех лифтов. */
 function tick() {
+  tickPressure();
   state.forEach(tickElevator);
 }
 
@@ -294,7 +345,9 @@ function setElevator(id, patch) {
 function resetRandom() {
   state.forEach((lift) => {
     Object.assign(lift, randomReadings(lift));
-    lift.status = 'working';
+    // Возвращаемся не к «всё работает», а к тому, что записано
+    // в shared/params.json: три лифта из шести стоят.
+    lift.status = statusOf(lift.number);
     lift.statusNote = null;
     lift.frozen = false;
   });
@@ -323,10 +376,12 @@ module.exports = {
   ADDRESS,
   FLOORS,
   CAMERA_FLOOR,
+  CAPACITY,
   TICK_MS,
   STATUSES,
   MAX_WAITING,
   getElevators,
+  getPressure,
   getAdminElevators,
   setElevator,
   resetRandom,

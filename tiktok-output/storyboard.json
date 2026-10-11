@@ -1,0 +1,40 @@
+{
+  "title": "TIU GO — не стой в очереди на лифт",
+  "lang": "en",
+  "aspect": "9:16",
+  "voice": "ru-RU-SvetlanaNeural",
+  "rate": "+15%",
+  "caption_style": "karaoke",
+  "caption": {
+    "uppercase": false,
+    "position": 0.72,
+    "highlight": "#5B8DEF"
+  },
+  "bgm": {
+    "mood": "upbeat",
+    "gain_db": -19
+  },
+  "beat_sync": true,
+  "sfx": true,
+  "sources": [],
+  "scenes": [
+    {
+      "text": "Шестнадцать этажей и три лифта из шести.",
+      "keywords": [],
+      "media": "/Users/a1111/.claude/skills/tiktok-video/projects/tiu-go-ru/media-src/shot1-problem.png",
+      "effect": "kb_in"
+    },
+    {
+      "text": "В TIU GO видно, сколько человек ждёт внизу.",
+      "keywords": [],
+      "media": "/Users/a1111/.claude/skills/tiktok-video/projects/tiu-go-ru/media-src/shot2-app.png",
+      "effect": "kb_out"
+    },
+    {
+      "text": "Скачай TIU GO, чтобы не стоять в очереди на лифт.",
+      "keywords": [],
+      "media": "/Users/a1111/.claude/skills/tiktok-video/projects/tiu-go-ru/media-src/shot3-brand.png",
+      "effect": "kb_in"
+    }
+  ]
+}

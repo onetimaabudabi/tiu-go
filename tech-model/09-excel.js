@@ -174,7 +174,7 @@ function sheetParams(wb, R) {
   block('Поток людей', [
     ['Студентов', PARAMS.people.students, 'чел', 'students'],
     ['Сотрудников', PARAMS.people.staff, 'чел', 'staff'],
-    ['Поездок на человека за день', PARAMS.simulation.tripsPerPersonPerDay, 'шт', 'trips'],
+    ['Поездок на человека за день', PARAMS.people.tripsPerPersonPerDay, 'шт', 'trips'],
     ['Запас мест в правиле решения', R.opt.optimum, 'чел', 'margin']
   ]);
 

@@ -39,7 +39,9 @@
     'arrow-up', 'arrow-down', 'arrow-right', 'chevron-down',
 
     'flame', 'zap', 'stairs', 'camera',
-    'signal', 'signal-low', 'signal-medium', 'signal-high'
+    'signal', 'signal-low', 'signal-medium', 'signal-high',
+
+    'trend-up', 'trend-down', 'telegram', 'copy', 'route'
   ];
 
   /**

@@ -15,8 +15,9 @@
  * Про скорость. Прямой розыгрыш камеры (30 кадров на каждое решение)
  * потребовал бы около двухсот миллионов бросков на 500 дней. Поэтому
  * распределение показаний камеры табулируется ОДИН раз по каждому
- * значению реальной загрузки, а в симуляции из таблицы делается выборка.
- * Статистически это то же самое, только в тысячу раз быстрее.
+ * значению реальной загрузки (модель 2, measurementTable), а в симуляции
+ * из таблицы делается выборка. Статистически это то же самое, только
+ * в тысячу раз быстрее. Ту же таблицу читает 3D-визуализация.
  *
  * Запуск:  npm run tech:sim
  */
@@ -40,48 +41,16 @@ const DAY_START = SIM.dayStart * 3600;
 const DAY_END = SIM.dayEnd * 3600;
 
 // ---------- Таблица показаний камеры ----------
+//
+// Распределение показаний строит модель 2 (measurementTable): прямой
+// розыгрыш камеры стоил бы сотни миллионов бросков на 500 дней, а
+// распределение от хода дня не зависит. Здесь таблица только опрашивается.
 
-/**
- * Распределение показаний камеры для каждой реальной загрузки.
- * Строится один раз при загрузке модуля и дальше только опрашивается.
- */
-function buildMeasurementTable(trials = 20000) {
-  const table = [];
-
-  for (let n = 0; n <= CAPACITY + 3; n += 1) {
-    const rng = io.makeRng(SIM.randomSeed + n * 7919);
-    const counts = new Array(n + 6).fill(0);
-
-    for (let i = 0; i < trials; i += 1) {
-      const d = Math.min(errors.measure(n, rng).tracked, counts.length - 1);
-      counts[d] += 1;
-    }
-
-    // Переводим в кумулятивные доли — по ним удобно делать выборку
-    const cumulative = [];
-    let acc = 0;
-    counts.forEach((c) => {
-      acc += c / trials;
-      cumulative.push(acc);
-    });
-
-    table.push(cumulative);
-  }
-
-  return table;
-}
-
-const MEASURE_TABLE = buildMeasurementTable();
+const MEASURE_TABLE = errors.measurementTable(CAPACITY);
 
 /** Выборка показаний камеры при реальной загрузке n. */
 function sampleDetected(n, rng) {
-  const row = MEASURE_TABLE[Math.min(n, MEASURE_TABLE.length - 1)];
-  const u = rng();
-
-  for (let d = 0; d < row.length; d += 1) {
-    if (u <= row[d]) return d;
-  }
-  return row.length - 1;
+  return errors.sampleFromTable(MEASURE_TABLE, n, rng);
 }
 
 // ---------- Поток людей ----------
@@ -99,7 +68,7 @@ function toSeconds(hhmm) {
  */
 function dailyArrivals() {
   const total = Math.round(
-    (PARAMS.people.students + PARAMS.people.staff) * SIM.tripsPerPersonPerDay
+    (PARAMS.people.students + PARAMS.people.staff) * PARAMS.people.tripsPerPersonPerDay
   );
 
   const peakWeight = PARAMS.peakIntervals.reduce((s, p) => s + p.weight, 0);
@@ -139,7 +108,7 @@ function buildArrivals(rng) {
   const arrivals = [];
 
   const addPerson = (time) => {
-    const fromLobby = rng() < SIM.lobbyShare;
+    const fromLobby = rng() < PARAMS.people.lobbyShare;
     const to = pickFloor(rng);
     let from = 1;
 
@@ -610,7 +579,7 @@ async function run() {
 }
 
 module.exports = {
-  buildMeasurementTable, sampleDetected, dailyArrivals, buildArrivals, simulateDay, run
+  sampleDetected, dailyArrivals, buildArrivals, simulateDay, run
 };
 
 if (require.main === module) {

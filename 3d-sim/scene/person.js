@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
-import { WALK, PERF } from '../logic/params.js';
+import { CABIN, WALK, PERF } from '../logic/params.js';
 import { blobShadowTexture } from './textures.js';
 
 // Mixamo отдаёт модели в сантиметрах — ориентир для перевода в метры.
@@ -30,9 +30,11 @@ import { blobShadowTexture } from './textures.js';
 // зависят от настроек экспорта и на них нельзя полагаться.
 const MIXAMO_SCALE = 0.01;
 
-// Рост персонажа в сцене. Это размер картинки, а не параметр модели:
-// в tech-model/params.js роста нет, там человек описан площадью силуэта.
-const PERSON_HEIGHT = 1.75;
+// Рост персонажа. Берём тот же, по которому техническая модель считает
+// обзор камеры (tech-model/params.js, cabin.personHeight): если на экране
+// люди выше или ниже, картинка перестаёт соответствовать расчёту угла
+// наклона камеры и доли видимых голов.
+const PERSON_HEIGHT = CABIN.personHeight;
 
 const FILES = {
   // Idle.fbx идёт со скином: он же модель, он же анимация стояния
@@ -401,7 +403,11 @@ export class Person {
     this.targetHeading = 0;
 
     this.path = [];
-    this.speed = WALK.speed + (((this.id * 53) % 21) - 10) / 100 * WALK.speedJitter * 10;
+    // Скорость шага: средняя из параметров плюс разброс ±walkSpeedSpread.
+    // Разброс не случайный, а по номеру человека — чтобы один и тот же
+    // прогон выглядел одинаково от запуска к запуску.
+    const spread = (((this.id * 53) % 21) - 10) / 10;   // −1 … +1
+    this.speed = WALK.speed + spread * WALK.speedJitter;
     this.onArrive = null;
 
     // ---- появление и исчезновение ----
@@ -562,6 +568,19 @@ export class Person {
   }
 
   /** Развернуть корпус в сторону точки (мгновенно). */
+  /**
+   * Срезать человека вместе с его этажом.
+   *
+   * В плане видно только первый этаж, и пассажир шестого, оставленный
+   * видимым, выглядит висящим над холлом. Флаг отдельный от прочих:
+   * возвращать его должен тот же, кто поставил.
+   */
+  setAbove(above) {
+    if (this.above === above) return;
+    this.above = above;
+    this.root.visible = !above && this.opacity > 0.01;
+  }
+
   faceTo(x, z) {
     this.heading = Math.atan2(x - this.position.x, z - this.position.z);
     this.prevHeading = this.heading;
@@ -761,7 +780,7 @@ export class Person {
     for (const m of this.lodMaterials) { m.opacity = value; m.transparent = fading; }
 
     this.blob.material.opacity = value * 0.55;
-    this.root.visible = value > 0.01;
+    this.root.visible = value > 0.01 && !this.above;
   }
 
   /**

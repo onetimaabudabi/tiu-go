@@ -26,6 +26,17 @@ export class Crowd {
     this.fullDetailBudget = start.fullDetail;
     this.lodDistance = start.lodDistance;
     this.shadowBudget = start.shadowCasters;
+
+    // Выше какой отметки людей не показываем. Нужно виду «Сверху»:
+    // перекрытия там срезаны по первому этажу, и пассажиры верхних
+    // этажей иначе висят над холлом в пустоте.
+    this.ceiling = Infinity;
+  }
+
+  /** Показывать только тех, кто ниже отметки y (Infinity — всех). */
+  setCeiling(y) {
+    this.ceiling = y;
+    for (const person of this.people) person.setAbove(person.position.y >= y);
   }
 
   /** Новые бюджеты детализации. */
@@ -48,6 +59,7 @@ export class Crowd {
 
     const person = new Person(this.assets);
     person.placeAt(x, y, z);
+    if (this.ceiling !== Infinity) person.setAbove(y >= this.ceiling);
     if (facing) person.faceTo(facing.x, facing.z);
 
     this.scene.add(person.root);
@@ -86,7 +98,10 @@ export class Crowd {
   render(alpha, camera, dt) {
     const cameraPosition = camera.position;
 
-    for (const person of this.people) person.render(alpha, cameraPosition);
+    for (const person of this.people) {
+      if (this.ceiling !== Infinity) person.setAbove(person.position.y >= this.ceiling);
+      person.render(alpha, cameraPosition);
+    }
 
     // Ранжирование по дальности — не каждый кадр: сортировка семидесяти
     // человек каждые 16 мс не стоит своей точности, а расстояния

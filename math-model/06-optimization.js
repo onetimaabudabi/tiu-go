@@ -123,6 +123,39 @@ function gridSearch(opts = {}) {
 }
 
 // ---------- Запуск ----------
+// Целевое ожидание в пик, с. Больше минуты в очереди человек
+// воспринимает как «лифта не дождёшься» — отсюда и порог.
+const TARGET_WAIT = 60;
+
+/**
+ * Сколько лифтов нужно, чтобы ожидание в самый тяжёлый пик укладывалось
+ * в целевое. Считаем по той же модели M/M/c, что и в 01-queueing-model:
+ * интенсивность обслуживания берём из физической модели, а число каналов
+ * наращиваем, пока Wq не опустится до цели.
+ *
+ * Возвращает и ответ, и всю таблицу — она нужна отчёту.
+ */
+function liftsForTarget(targetWait = TARGET_WAIT, p = PARAMS) {
+  const mu = physics.serviceRate(p.capacity, p);
+
+  // Самый тяжёлый пик ищем по интенсивности, а не по подписи
+  const worst = p.peakHours.reduce((a, b) =>
+    (arrivalRate((b.start + b.end) / 2, p) > arrivalRate((a.start + a.end) / 2, p) ? b : a));
+  const lambda = arrivalRate((worst.start + worst.end) / 2, p);
+
+  const rows = [];
+  let needed = null;
+
+  for (let c = 1; c <= 40; c += 1) {
+    const r = queue.mmc(lambda, mu, c);
+    const wq = r.stable ? r.Wq : Infinity;
+    rows.push({ c, stable: r.stable, rho: r.rho, wq });
+    if (needed === null && r.stable && wq <= targetWait) needed = c;
+  }
+
+  return { peak: worst, lambda, mu, target: targetWait, needed, rows };
+}
+
 async function run(p = PARAMS) {
   console.log('[optimize] Ищу оптимальное распределение потока в утренний пик…');
 
@@ -202,10 +235,39 @@ async function run(p = PARAMS) {
 
   console.log('[optimize] График сохранён: optimization_flow_split.png');
 
-  return { best, current, smart, random };
+  // ---------- Сколько лифтов нужно под целевое ожидание ----------
+  const need = liftsForTarget(TARGET_WAIT, p);
+
+  console.log('');
+  console.log(`[optimize] Сколько лифтов нужно, чтобы ждать не дольше ${need.target} с`);
+  console.log(`[optimize] в самый тяжёлый пик (${need.peak.label}, λ = ${need.lambda.toFixed(3)} чел/с):`);
+  console.log('');
+  console.log('   лифтов | загрузка ρ | ожидание Wq, с');
+
+  for (const r of need.rows) {
+    if (r.c > 16 && r.c !== need.needed) continue;      // таблицу не раздуваем
+    const wq = r.stable ? r.wq.toFixed(1) : '∞';
+    const mark = r.c === p.elevators ? '  ← сейчас'
+      : r.c === need.needed ? '  ← цель достигнута' : '';
+    console.log(
+      `   ${String(r.c).padStart(6)} | ${r.rho.toFixed(2).padStart(10)} | ${wq.padStart(14)}${mark}`
+    );
+  }
+
+  console.log('');
+  if (need.needed) {
+    console.log(`[optimize] Ответ: ${need.needed} лифтов против ${p.elevators} работающих сейчас.`);
+    console.log('[optimize] Достроить столько шахт в готовом здании нельзя — значит, пик');
+    console.log('[optimize] нельзя «пережать» лифтами, и часть потока обязана уйти на лестницу.');
+    console.log('[optimize] Этим и занимается приложение: оно подсказывает, кому именно.');
+  } else {
+    console.log('[optimize] Целевое ожидание недостижимо даже на сорока лифтах.');
+  }
+
+  return { best, current, smart, random, lifts: need };
 }
 
-module.exports = { splitByFloor, splitRandom, totalTime, gridSearch, run };
+module.exports = { splitByFloor, splitRandom, totalTime, gridSearch, liftsForTarget, TARGET_WAIT, run };
 
 if (require.main === module) {
   run().catch((err) => { console.error('[optimize] Ошибка:', err.message); process.exit(1); });

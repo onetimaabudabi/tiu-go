@@ -336,6 +336,404 @@ function busiestLift(elevators) {
     .reduce((a, b) => (!a || queueOf(b) > queueOf(a) ? b : a), null);
 }
 
+// ---------- История наблюдений и прогноз ----------
+//
+// Камера отдаёт только мгновенный снимок: сколько человек в кабине и
+// сколько стоит внизу. Чтобы сказать «через пять минут очередь вырастет
+// до двенадцати», нужна не одна точка, а их ряд. Поэтому сервер ведёт
+// скользящее окно наблюдений и считает по нему тенденцию.
+//
+// История живёт в памяти процесса. Это сознательный выбор: показания
+// лифтов нужны ровно до тех пор, пока по ним считается тренд, и писать
+// их на диск незачем. Для планировщика выхода, которому нужна картина
+// за несколько дней, рядом копятся почасовые средние — они как раз
+// сохраняются (см. HOURLY_FILE).
+
+const HISTORY_WINDOW_MS = 30 * 60 * 1000;  // глубина окна наблюдений
+const HISTORY_SAMPLE_MS = 10 * 1000;       // как часто снимаем показания
+const TREND_POINTS = 10;                   // по скольким последним точкам тренд
+
+// Ниже этого наклона тенденции нет — это дрожание данных, а не рост.
+// Для отдельного лифта и для всего холла пороги разные: в холле
+// складываются очереди трёх кабин, и шум там втрое выше.
+const TREND_DEADZONE_LIFT = 0.3;   // чел/мин
+const TREND_DEADZONE_HALL = 0.8;   // чел/мин
+
+// Горизонты прогноза, минуты
+const FORECAST_HORIZONS = [5, 10];
+
+/** id лифта -> массив точек { t, occupancy, waiting } */
+const history = new Map();
+
+/** Записывает текущие показания всех лифтов в историю. */
+function recordHistory(now = Date.now()) {
+  const elevators = mock.getElevators();
+
+  elevators.forEach((lift) => {
+    const points = history.get(lift.id) || [];
+
+    points.push({
+      t: now,
+      occupancy: Number(lift.occupancy) || 0,
+      waiting: isAvailable(lift) ? queueOf(lift) : 0
+    });
+
+    // Выбрасываем всё, что старше окна: память не должна расти
+    while (points.length && now - points[0].t > HISTORY_WINDOW_MS) points.shift();
+
+    history.set(lift.id, points);
+  });
+
+  recordHourly(elevators, now);
+  return elevators;
+}
+
+/**
+ * Наклон прямой наименьших квадратов по последним TREND_POINTS точкам,
+ * в единицах поля за минуту.
+ *
+ * Берём именно МНК, а не разность «последняя точка минус первая»:
+ * разность целиком зависит от двух случайных значений, а наклон
+ * использует весь ряд и устойчив к одиночному выбросу.
+ */
+function trendPerMinute(points, field) {
+  const last = points.slice(-TREND_POINTS);
+  if (last.length < 3) return 0;
+
+  const t0 = last[0].t;
+  let sumX = 0;
+  let sumY = 0;
+  let sumXX = 0;
+  let sumXY = 0;
+
+  last.forEach((point) => {
+    const x = (point.t - t0) / 60000;   // минуты от начала отрезка
+    const y = Number(point[field]) || 0;
+
+    sumX += x;
+    sumY += y;
+    sumXX += x * x;
+    sumXY += x * y;
+  });
+
+  const n = last.length;
+  const denominator = n * sumXX - sumX * sumX;
+
+  // Все точки пришлись на один момент времени — наклона нет
+  if (Math.abs(denominator) < 1e-9) return 0;
+
+  return (n * sumXY - sumX * sumY) / denominator;
+}
+
+/** Словесная оценка наклона: растёт, падает или держится. */
+function trendLabel(slope, deadzone) {
+  if (slope > deadzone) return 'growing';
+  if (slope < -deadzone) return 'falling';
+  return 'stable';
+}
+
+/** Проекция значения на horizon минут вперёд с ограничением сверху и снизу. */
+function project(base, slope, minutes, max) {
+  const value = Math.round(base + slope * minutes);
+  return Math.min(Math.max(value, 0), max);
+}
+
+/**
+ * Прогноз по одному лифту. У неработающего прогноза нет: кабина стоит,
+ * очередь к ней уже разошлась, и экстраполировать нечего.
+ */
+function forecastLift(lift) {
+  if (!isAvailable(lift)) return null;
+
+  const points = history.get(lift.id) || [];
+  const occupancySlope = trendPerMinute(points, 'occupancy');
+  const waitingSlope = trendPerMinute(points, 'waiting');
+
+  const occupancy = Number(lift.occupancy) || 0;
+  const waiting = queueOf(lift);
+  const capacity = Number(lift.capacity) || mock.CAPACITY;
+
+  const result = {
+    samples: points.length,
+    trendOccupancy: Number(occupancySlope.toFixed(2)),
+    trendWaiting: Number(waitingSlope.toFixed(2))
+  };
+
+  FORECAST_HORIZONS.forEach((minutes) => {
+    result['in' + minutes + 'min'] = {
+      occupancy: project(occupancy, occupancySlope, minutes, capacity),
+      waiting: project(waiting, waitingSlope, minutes, mock.MAX_WAITING),
+      trend: trendLabel(waitingSlope, TREND_DEADZONE_LIFT)
+    };
+  });
+
+  return result;
+}
+
+/**
+ * Прогноз по холлу целиком: столько человек будет стоять внизу у всех
+ * работающих лифтов вместе. Именно это число видит человек на главном
+ * экране — к какому конкретно лифту он встанет, он решает уже на месте.
+ *
+ * Загруженность в холле усредняется по кабинам: сумма мест по шести
+ * лифтам ничего не значит, а средняя наполненность — значит.
+ */
+function forecastHall(elevators) {
+  const working = elevators.filter(isAvailable);
+
+  if (!working.length) return null;
+
+  let waitingSlope = 0;
+  let occupancySlope = 0;
+  let waiting = 0;
+  let occupancy = 0;
+  let capacity = 0;
+  let samples = 0;
+
+  working.forEach((lift) => {
+    const points = history.get(lift.id) || [];
+
+    waitingSlope += trendPerMinute(points, 'waiting');
+    occupancySlope += trendPerMinute(points, 'occupancy');
+    waiting += queueOf(lift);
+    occupancy += Number(lift.occupancy) || 0;
+    capacity += Number(lift.capacity) || mock.CAPACITY;
+    samples = Math.max(samples, points.length);
+  });
+
+  const count = working.length;
+  const result = {
+    samples,
+    trendOccupancy: Number((occupancySlope / count).toFixed(2)),
+    trendWaiting: Number(waitingSlope.toFixed(2))
+  };
+
+  FORECAST_HORIZONS.forEach((minutes) => {
+    result['in' + minutes + 'min'] = {
+      occupancy: project(
+        Math.round(occupancy / count), occupancySlope / count, minutes,
+        Math.round(capacity / count)
+      ),
+      waiting: project(waiting, waitingSlope, minutes, mock.MAX_WAITING * count),
+      trend: trendLabel(waitingSlope, TREND_DEADZONE_HALL)
+    };
+  });
+
+  return result;
+}
+
+// ---------- Почасовая статистика ----------
+//
+// Прогноз на пять минут живёт в оперативной памяти, а планировщику выхода
+// нужна картина за несколько дней: «по вторникам в 9:40 ждут около сорока
+// секунд». Хранить ради этого все снимки не нужно — достаточно средних
+// по часу и дню недели, а это полтора килобайта на всю неделю.
+//
+// Копится честно: среднее по тем наблюдениям, которые сервер реально
+// видел. Пока наблюдений мало, планировщик так и говорит — считает
+// по расписанию пар, а не по истории.
+
+const HOURLY_FILE = path.join(__dirname, 'data', 'history.json');
+
+// Сколько наблюдений в ячейке считаем достаточным, чтобы верить среднему
+const HOURLY_MIN_SAMPLES = 30;
+
+// Потолок счётчика: дальше среднее обновляется скользящим окном и
+// свежие дни постепенно вытесняют старые.
+const HOURLY_MAX_SAMPLES = 20000;
+
+let hourly = null;        // { 'день-час': { samples, waitSum, queueSum } }
+let hourlyDirty = false;
+let hourlySavedAt = 0;
+
+// Чаще раза в минуту на диск не пишем
+const HOURLY_SAVE_MS = 60 * 1000;
+
+function hourlyKey(day, hour) {
+  return day + '-' + hour;
+}
+
+function readHourly() {
+  if (hourly) return hourly;
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(HOURLY_FILE, 'utf8'));
+    hourly = raw && typeof raw === 'object' ? raw : {};
+  } catch (err) {
+    hourly = {};
+  }
+
+  return hourly;
+}
+
+function saveHourly(now = Date.now()) {
+  if (!hourlyDirty || now - hourlySavedAt < HOURLY_SAVE_MS) return;
+
+  try {
+    fs.writeFileSync(HOURLY_FILE, JSON.stringify(hourly), 'utf8');
+    hourlyDirty = false;
+    hourlySavedAt = now;
+  } catch (err) {
+    console.error('[история] не удалось сохранить:', err.message);
+  }
+}
+
+/**
+ * Добавляет текущий момент в почасовую копилку.
+ * Среднее ожидание берём по работающим лифтам — именно его человек
+ * и почувствует, встав в холле.
+ */
+function recordHourly(elevators, now = Date.now()) {
+  const working = elevators.filter(isAvailable);
+  if (!working.length) return;
+
+  const context = buildContext(elevators);
+  const waits = working.map((lift) => computeForecast(lift, 1, context).waitTime);
+  const avgWait = waits.reduce((sum, value) => sum + value, 0) / waits.length;
+
+  const date = new Date(now);
+  const key = hourlyKey(date.getDay(), date.getHours());
+  const store = readHourly();
+  const cell = store[key] || { samples: 0, waitSum: 0, queueSum: 0 };
+
+  // Переполнение: ужимаем накопленное вдвое, сохраняя среднее
+  if (cell.samples >= HOURLY_MAX_SAMPLES) {
+    cell.samples = Math.round(cell.samples / 2);
+    cell.waitSum = cell.waitSum / 2;
+    cell.queueSum = cell.queueSum / 2;
+  }
+
+  cell.samples += 1;
+  cell.waitSum += avgWait;
+  cell.queueSum += firstFloorQueue(elevators);
+
+  store[key] = cell;
+  hourlyDirty = true;
+  saveHourly(now);
+}
+
+/**
+ * Что известно про этот день недели и час.
+ * @returns {{waitTime: number, queue: number, samples: number}|null}
+ */
+function hourlyStats(day, hour) {
+  const cell = readHourly()[hourlyKey(day, hour)];
+  if (!cell || cell.samples < HOURLY_MIN_SAMPLES) return null;
+
+  return {
+    waitTime: cell.waitSum / cell.samples,
+    queue: cell.queueSum / cell.samples,
+    samples: cell.samples
+  };
+}
+
+// ---------- Планировщик выхода ----------
+
+const PLANNER_BUFFER_SEC = 120;     // запас, который закладываем всегда
+const PLANNER_BOARDING = 10;        // посадка и высадка, с
+const PLANNER_RELAXED_MIN = 10;     // больше этого до выхода — «есть время»
+const PLANNER_SOON_MIN = 3;         // меньше этого — «пора выходить»
+
+// Во сколько раз дольше ждать в час пик, если истории ещё нет.
+// Оценка грубая и помечена в ответе как source: 'schedule'.
+const PLANNER_PEAK_FACTOR = 1.8;
+
+// За сколько минут до начала пика поток уже заметен
+const PLANNER_PEAK_LEAD = 5;
+
+function clampFloor(value) {
+  const floor = Math.round(Number(value));
+  if (!Number.isFinite(floor)) return 1;
+  return Math.min(Math.max(floor, 1), mock.FLOORS);
+}
+
+/** 'ЧЧ:ММ' -> минуты от начала суток, либо null, если строка не та. */
+function parseHhmm(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function formatHhmm(date) {
+  return String(date.getHours()).padStart(2, '0') + ':' +
+    String(date.getMinutes()).padStart(2, '0');
+}
+
+/**
+ * Ближайший момент, когда наступит указанный день недели и время.
+ * Сегодняшнее время, которое уже прошло, уезжает на следующую неделю —
+ * иначе планировщик советовал бы выйти вчера.
+ */
+function nextOccurrence(dayOfWeek, minutesOfDay, now = new Date()) {
+  const target = new Date(now);
+  target.setSeconds(0, 0);
+  target.setHours(Math.floor(minutesOfDay / 60), minutesOfDay % 60);
+
+  let shift = (dayOfWeek - now.getDay() + 7) % 7;
+  if (shift === 0 && target.getTime() <= now.getTime()) shift = 7;
+
+  target.setDate(target.getDate() + shift);
+  return target;
+}
+
+/** Среднее ожидание по работающим лифтам прямо сейчас. */
+function currentAverageWait() {
+  const elevators = mock.getElevators();
+  const context = buildContext(elevators);
+  const working = elevators.filter(isAvailable);
+
+  if (!working.length) return 0;
+
+  const total = working.reduce((sum, lift) => (
+    sum + computeForecast(lift, 1, context).waitTime
+  ), 0);
+
+  return total / working.length;
+}
+
+/** Попадает ли время в пиковый интервал учебного дня. */
+function isPeakMinute(minutesOfDay) {
+  return PEAK_HOURS.some((peak) => (
+    minutesOfDay >= toMinutes(peak.start) - PLANNER_PEAK_LEAD &&
+    minutesOfDay < toMinutes(peak.end)
+  ));
+}
+
+/**
+ * Сколько ждать лифта в этот день недели и час.
+ * Сначала смотрим в накопленную статистику, и только если её мало —
+ * считаем по расписанию пар от текущей загрузки.
+ */
+function estimateWait(dayOfWeek, hour) {
+  const stats = hourlyStats(dayOfWeek, hour);
+
+  if (stats) {
+    return { waitTime: stats.waitTime, source: 'history', samples: stats.samples };
+  }
+
+  const base = currentAverageWait();
+  const peak = isPeakMinute(hour * 60);
+
+  return {
+    waitTime: peak ? base * PLANNER_PEAK_FACTOR : base,
+    source: 'schedule',
+    samples: 0
+  };
+}
+
+/** Запускает съём показаний. Возвращает таймер — пригодится тестам. */
+function startHistory() {
+  recordHistory();
+  const timer = setInterval(() => recordHistory(), HISTORY_SAMPLE_MS);
+  timer.unref?.();
+  return timer;
+}
+
 /**
  * Полная выкладка по всем лифтам для заданного этажа назначения.
  *
@@ -356,6 +754,7 @@ function buildStatus(destination, options) {
 
     return Object.assign({
       id: lift.id,
+      forecast: forecastLift(lift),
       number: lift.number,      // номер для подписи «Лифт N» на нужном языке
       cameraFloor: lift.cameraFloor, // всегда 1: камеры стоят только внизу
       floors: lift.floors, // всего этажей в корпусе — нужно фронту для шахты
@@ -387,6 +786,12 @@ function buildStatus(destination, options) {
     total: elevators.length,
     working: elevators.filter((lift) => lift.available).length,
     queueAtFirstFloor: firstFloorQueue(elevators),
+    // Прогноз по холлу: сколько человек будет стоять внизу через 5 и 10 минут
+    forecast: forecastHall(raw),
+    // Ссылка на канал проекта — берётся из .env, фронтенд её только открывает
+    channelUrl: process.env.TELEGRAM_CHANNEL_URL || null,
+    // Публичный адрес мини-аппа: из него собирается ссылка «поделиться»
+    appUrl: process.env.WEBAPP_URL || null,
     elevators
   }, peak);
 }
@@ -861,6 +1266,64 @@ app.get('/api/status', (req, res) => {
 
   res.json(buildStatus(destination));
 });
+/**
+ * Планировщик выхода: во сколько выходить, чтобы успеть к нужному часу.
+ *
+ * Тело запроса: { fromFloor, toFloor, targetTime: 'ЧЧ:ММ', dayOfWeek }
+ *
+ * Ожидание берём из почасовой статистики — сервер копит её сам, пока
+ * работает. Если наблюдений за этот час ещё мало, честно считаем по
+ * расписанию пар и говорим об этом в поле source: выдавать оценку по
+ * двум замерам за наблюдения было бы обманом.
+ */
+app.post('/api/planner', (req, res) => {
+  const body = req.body || {};
+
+  const fromFloor = clampFloor(body.fromFloor);
+  const toFloor = clampFloor(body.toFloor);
+  const parsed = parseHhmm(body.targetTime);
+
+  if (parsed === null) {
+    return res.status(400).json({ error: 'targetTime должен быть в формате ЧЧ:ММ' });
+  }
+
+  const now = new Date();
+  const day = Number.isInteger(Number(body.dayOfWeek))
+    ? ((Number(body.dayOfWeek) % 7) + 7) % 7
+    : now.getDay();
+
+  const target = nextOccurrence(day, parsed, now);
+  const estimate = estimateWait(day, Math.floor(parsed / 60));
+
+  // Дорога: проезд между этажами плюс посадка и высадка
+  const travelTime = Math.abs(toFloor - fromFloor) * SECONDS_PER_FLOOR +
+    PLANNER_BOARDING;
+
+  const lead = estimate.waitTime + travelTime + PLANNER_BUFFER_SEC;
+  const exitAt = new Date(target.getTime() - lead * 1000);
+  const minutesLeft = (exitAt.getTime() - now.getTime()) / 60000;
+
+  let status = 'now';
+  if (minutesLeft > PLANNER_RELAXED_MIN) status = 'ok';
+  else if (minutesLeft >= PLANNER_SOON_MIN) status = 'soon';
+
+  res.json({
+    fromFloor,
+    toFloor,
+    targetTime: formatHhmm(target),
+    targetAt: target.toISOString(),
+    exitTime: formatHhmm(exitAt),
+    exitAt: exitAt.toISOString(),
+    waitTime: Math.round(estimate.waitTime),
+    travelTime: Math.round(travelTime),
+    bufferMinutes: PLANNER_BUFFER_SEC / 60,
+    minutesLeft: Math.round(minutesLeft),
+    status,
+    source: estimate.source,
+    samples: estimate.samples
+  });
+});
+
 
 /**
  * Жалоба на лифт: { elevatorId, reason, comment }.
@@ -988,6 +1451,9 @@ if (require.main === module) {
   // Запускаем симуляцию тестовых данных (обновление каждые 3 секунды)
   mock.startSimulation();
 
+  // Съём показаний для прогноза: раз в 10 секунд, окно — полчаса
+  startHistory();
+
   // Рассылка уведомлений раз в 30 секунд
   startNotifications();
 
@@ -1027,6 +1493,17 @@ module.exports = {
   computeConfidence,
   computeForecast,
   computeTimes,
+  trendPerMinute,
+  trendLabel,
+  forecastLift,
+  forecastHall,
+  recordHistory,
+  startHistory,
+  hourlyStats,
+  parseHhmm,
+  nextOccurrence,
+  estimateWait,
+  currentAverageWait,
   buildContext,
   buildStatus,
   queueOf,

@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { HALL, PALETTE, LIGHT, ELEVATORS, liftX } from '../logic/params.js';
+import { HALL, PALETTE, LIGHT, ELEVATORS, frontOf } from '../logic/params.js';
 
 export class Lighting {
   constructor(scene) {
@@ -38,11 +38,12 @@ export class Lighting {
   /** Направленный свет — имитация солнца через витражи холла. */
   #sun() {
     const sun = new THREE.DirectionalLight(PALETTE.sun, LIGHT.sunIntensity);
-    sun.position.set(14, 18, 12);
-    sun.target.position.set(0, 1, -2);
+    // Солнце со стороны входа: свет идёт вдоль коридора, как и должен
+    sun.position.set(18, 18, 9);
+    sun.target.position.set(0, 1, 0);
     sun.castShadow = true;
 
-    const d = Math.max(HALL.width, HALL.depth) * 0.8;
+    const d = Math.max(HALL.length, HALL.span) * 0.8;
     sun.shadow.camera.left = -d;
     sun.shadow.camera.right = d;
     sun.shadow.camera.top = d;
@@ -64,7 +65,9 @@ export class Lighting {
       const light = new THREE.PointLight(
         PALETTE.cabinLight, LIGHT.hallSpotIntensity, 7, 2
       );
-      light.position.set(liftX(i), HALL.height - 0.25, HALL.liftWall + 1.1);
+      // Лампа висит в коридоре перед створками — со своей стороны
+      const spot = frontOf(i, 1.1);
+      light.position.set(spot.x, HALL.height - 0.25, spot.z);
 
       this.hallLights.push({ light, working: ELEVATORS.working.includes(i) });
       this.group.add(light);
@@ -72,7 +75,7 @@ export class Lighting {
 
     // Заполняющий свет в центре холла, чтобы середина не проваливалась.
     this.fill = new THREE.PointLight(0xffffff, 0.35, 18, 2);
-    this.fill.position.set(0, HALL.height - 0.4, 1);
+    this.fill.position.set(0, HALL.height - 0.4, 0);
     this.group.add(this.fill);
   }
 

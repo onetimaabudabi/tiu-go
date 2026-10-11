@@ -1,6 +1,13 @@
 /**
  * Лифт: шахта, кабина, створки, табло.
  *
+ * Лифт собирается в СВОИХ координатах: ось шахты — x = 0, плоскость
+ * створок — z = 0, двери смотрят в +Z. На место его ставит группа —
+ * сдвиг вдоль коридора, своя сторона, поворот на 180° для левой группы
+ * (см. liftAnchor в logic/params.js). Поэтому встречная расстановка
+ * шахт ничего в этом файле не усложняет: обе группы собираются одним
+ * и тем же кодом, и геометрия у всех шести лифтов общая.
+ *
  * Кинематика повторяет tech-model/04-elevator-physics.js — трапецеидальный
  * профиль скорости с разгоном и торможением params.elevators.acceleration
  * до params.elevators.speed. Время рейса, посчитанное здесь, совпадает
@@ -14,8 +21,9 @@
 
 import * as THREE from 'three';
 import {
-  BUILDING, CABIN, HALL, PALETTE, LIGHT, ELEVATORS, liftX, floorY
+  BUILDING, CABIN, HALL, PALETTE, LIGHT, ELEVATORS, liftAnchor, floorY
 } from '../logic/params.js';
+import { profile, travelled } from '../logic/kinematics.js';
 import { signTexture, createDisplay, css } from './textures.js';
 
 // Плавная кривая для створок и прочих «механических» движений
@@ -24,6 +32,12 @@ export function easeInOutCubic(t) {
 }
 
 const DOOR_HEIGHT = 2.1;
+
+// Чистый проём створок. Он уже кабины: по ГОСТ 5746 у лифта на 1000 кг
+// кабина 1100 мм, а двери 900. Из-за этого в кабине есть передняя стенка
+// по бокам от дверей, и люди заходят по одному, а не втроём в ряд.
+const DOOR_WIDTH = ELEVATORS.doorWidth;
+
 const SHAFT_DEPTH = HALL.shaftDepth;
 const CABIN_GAP = 0.12;       // зазор между порогом шахты и кабиной
 
@@ -111,11 +125,18 @@ export class Elevator {
     this.queue = 0;
     this.skipFlash = 0;         // секунды, пока горит «Пропущено»
 
-    this.x = liftX(number);
-    this.zFront = HALL.liftWall;
+    // Местные координаты: ось шахты и плоскость створок. Ноль здесь не
+    // случайность — именно он позволяет собрать обе группы одним кодом
+    // и поставить лифт на место поворотом группы.
+    this.x = 0;
+    this.zFront = 0;
+
+    this.anchor = liftAnchor(number);
 
     this.group = new THREE.Group();
     this.group.name = `elevator-${number}`;
+    this.group.position.set(this.anchor.x, 0, this.anchor.z);
+    this.group.rotation.y = this.anchor.rotationY;
 
     this.landingDoors = [];
     this.displays = [];
@@ -133,6 +154,13 @@ export class Elevator {
   /** Шахта: полупрозрачные стенки, направляющие рельсы, трос. */
   #buildShaft() {
     const height = BUILDING.height;
+
+    // Всё, что уходит вверх на все шестнадцать этажей, живёт в своей
+    // подгруппе: в виде «Сверху» её целиком выключают, иначе камера
+    // смотрит не в холл, а в полсотни метров шахтных стенок.
+    this.shaftGroup = new THREE.Group();
+    this.shaftGroup.name = 'shaft';
+    this.group.add(this.shaftGroup);
     const w = HALL.shaftWidth;
     const zCenter = this.zFront - SHAFT_DEPTH / 2;
 
@@ -150,12 +178,12 @@ export class Elevator {
     // Задняя и две боковые стенки
     const back = new THREE.Mesh(sharedBox('shaft-back', w, height, 0.06), wallMat);
     back.position.set(this.x, height / 2, zCenter - SHAFT_DEPTH / 2);
-    this.group.add(back);
+    this.shaftGroup.add(back);
 
     for (const side of [-1, 1]) {
       const wall = new THREE.Mesh(sharedBox('shaft-side', 0.06, height, SHAFT_DEPTH), wallMat);
       wall.position.set(this.x + side * w / 2, height / 2, zCenter);
-      this.group.add(wall);
+      this.shaftGroup.add(wall);
     }
 
     // Направляющие рельсы — два тонких цилиндра по бокам кабины
@@ -168,7 +196,7 @@ export class Elevator {
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(railGeo, railMat);
       rail.position.set(this.x + side * (CABIN.width / 2 + 0.16), height / 2, zCenter + 0.1);
-      this.group.add(rail);
+      this.shaftGroup.add(rail);
     }
 
     // Трос: тонкая линия от лебёдки до крыши кабины
@@ -181,7 +209,7 @@ export class Elevator {
       cableMat
     );
     this.cable.position.set(this.x, 0, zCenter);
-    this.group.add(this.cable);
+    this.shaftGroup.add(this.cable);
 
     // Машинное отделение сверху — чтобы трос не висел в воздухе
     const head = new THREE.Mesh(
@@ -191,7 +219,7 @@ export class Elevator {
       }))
     );
     head.position.set(this.x, height + 0.25, zCenter);
-    this.group.add(head);
+    this.shaftGroup.add(head);
 
     // Световая полоса в шахте: загорается, когда кабина едет
     const stripMat = new THREE.MeshBasicMaterial({
@@ -211,7 +239,7 @@ export class Elevator {
       );
       strip.rotation.y = side * Math.PI / 2;
       strip.position.set(this.x + side * (w / 2 - 0.04), BUILDING.height / 2, zCenter);
-      this.group.add(strip);
+      this.shaftGroup.add(strip);
     }
   }
 
@@ -242,6 +270,7 @@ export class Elevator {
     const ceiling = new THREE.Mesh(sharedBox('cabin-ceil', w, 0.06, d), ceilMat);
     ceiling.position.set(0, h + 0.03, 0);
     cabin.add(ceiling);
+    this.cabinCeiling = ceiling;
 
     // Боковые стены
     for (const side of [-1, 1]) {
@@ -320,8 +349,20 @@ export class Elevator {
     buttons.position.set(w / 2 - 0.056, 1.15, d / 2 - 0.45);
     cabin.add(buttons);
 
+    // Передняя стенка кабины: узкие простенки по бокам от проёма
+    const jambWidth = (w - DOOR_WIDTH) / 2;
+    if (jambWidth > 0.01) {
+      for (const side of [-1, 1]) {
+        const front = new THREE.Mesh(
+          sharedBox('cabin-front', jambWidth, h, 0.05), wallMat
+        );
+        front.position.set(side * (DOOR_WIDTH + jambWidth) / 2, h / 2, d / 2);
+        cabin.add(front);
+      }
+    }
+
     // Створки кабины
-    this.cabinDoors = this.#makeDoorPair(w, DOOR_HEIGHT, d / 2 + 0.02);
+    this.cabinDoors = this.#makeDoorPair(DOOR_WIDTH, DOOR_HEIGHT, d / 2 + 0.02);
     cabin.add(this.cabinDoors.group);
 
     cabin.position.set(this.x, 0, this.zFront - CABIN_GAP - CABIN.depth / 2);
@@ -365,12 +406,19 @@ export class Elevator {
       color: 0x8d9398, metalness: 0.6, roughness: 0.45
     }));
 
+    // Этажи выше первого собираем отдельно: вид «Сверху» их выключает
+    this.upperGroup = new THREE.Group();
+    this.upperGroup.name = 'upper-landings';
+    this.group.add(this.upperGroup);
+
     for (let f = 1; f <= BUILDING.floors; f += 1) {
       const y = floorY(f);
-      const pair = this.#makeDoorPair(CABIN.width, DOOR_HEIGHT, this.zFront + 0.03);
+      const parent = f === 1 ? this.group : this.upperGroup;
+
+      const pair = this.#makeDoorPair(DOOR_WIDTH, DOOR_HEIGHT, this.zFront + 0.03);
       pair.group.position.set(this.x, y, 0);
       pair.set(0);
-      this.group.add(pair.group);
+      parent.add(pair.group);
       this.landingDoors.push(pair);
 
       // Обрамление проёма: две стойки и перемычка
@@ -379,16 +427,16 @@ export class Elevator {
         const jamb = new THREE.Mesh(
           sharedBox('jamb', 0.09, DOOR_HEIGHT + 0.12, 0.12), frameMat
         );
-        jamb.position.set(side * (CABIN.width / 2 + 0.045), (DOOR_HEIGHT + 0.12) / 2, this.zFront + 0.03);
+        jamb.position.set(side * (DOOR_WIDTH / 2 + 0.045), (DOOR_HEIGHT + 0.12) / 2, this.zFront + 0.03);
         portal.add(jamb);
       }
       const lintel = new THREE.Mesh(
-        sharedBox('lintel', CABIN.width + 0.18, 0.12, 0.12), frameMat
+        sharedBox('lintel', DOOR_WIDTH + 0.18, 0.12, 0.12), frameMat
       );
       lintel.position.set(0, DOOR_HEIGHT + 0.06, this.zFront + 0.03);
       portal.add(lintel);
       portal.position.set(this.x, y, 0);
-      this.group.add(portal);
+      parent.add(portal);
 
       if (this.broken && f === 1) {
         // Табличка «Не работает» на створках в холле.
@@ -513,48 +561,26 @@ export class Elevator {
   // ======================= Кинематика =======================
 
   /**
-   * Трапецеидальный профиль: разгон a до скорости v, крейсер, торможение a.
-   * Если расстояния на разгон не хватает, профиль треугольный.
-   * Полное время совпадает с travelTime() из tech-model/04.
+   * Профиль поездки и путь к моменту t.
+   *
+   * Сами формулы живут в logic/kinematics.js — там же, откуда их берёт
+   * сравнение режимов. Здесь только короткие имена, чтобы не тянуть
+   * импорт в каждый вызов.
    */
-  static profile(distance) {
-    const v = ELEVATORS.speed;
-    const a = ELEVATORS.acceleration;
+  static profile(distance) { return profile(distance); }
 
-    if (distance <= 0) return { total: 0, tAcc: 0, dAcc: 0, vPeak: 0, tCruise: 0, distance: 0 };
+  static travelled(p, t) { return travelled(p, t); }
 
-    const rampDistance = (v * v) / a;      // путь на разгон плюс торможение
-
-    if (distance < rampDistance) {
-      const tAcc = Math.sqrt(distance / a);
-      return {
-        total: 2 * tAcc, tAcc, dAcc: distance / 2,
-        vPeak: a * tAcc, tCruise: 0, distance
-      };
-    }
-
-    const tAcc = v / a;
-    const dAcc = (v * v) / (2 * a);
-    const tCruise = (distance - rampDistance) / v;
-
-    return { total: 2 * tAcc + tCruise, tAcc, dAcc, vPeak: v, tCruise, distance };
-  }
-
-  /** Пройденный путь к моменту t внутри профиля. */
-  static travelled(profile, t) {
-    const a = ELEVATORS.acceleration;
-
-    if (t <= 0) return 0;
-    if (t >= profile.total) return profile.distance;
-
-    if (t < profile.tAcc) return 0.5 * a * t * t;
-
-    const tDecelStart = profile.tAcc + profile.tCruise;
-    if (t < tDecelStart) return profile.dAcc + profile.vPeak * (t - profile.tAcc);
-
-    const td = t - tDecelStart;
-    return profile.dAcc + profile.vPeak * profile.tCruise +
-      profile.vPeak * td - 0.5 * a * td * td;
+  /**
+   * Перевод местной точки лифта в мировые координаты холла.
+   *
+   * Группа повёрнута либо на 0, либо на 180°, поэтому полная матрица
+   * не нужна: достаточно знака. Этим пользуется симулятор, когда ведёт
+   * человека к месту внутри кабины.
+   */
+  toWorld(x, z) {
+    const sign = this.anchor.side > 0 ? -1 : 1;
+    return { x: this.anchor.x + sign * x, z: this.anchor.z + sign * z };
   }
 
   /** Время поездки с текущего этажа до указанного — для диспетчера. */
@@ -620,6 +646,27 @@ export class Elevator {
 
     const mat = on ? xrayMaterial() : doorMaterial(this.broken);
     for (const leaf of this.cabinDoors.leaves) leaf.mesh.material = mat;
+  }
+
+  /**
+   * Вид сверху: оставить только первый этаж.
+   *
+   * Шахта идёт на сорок восемь метров вверх, и камера, поднятая над
+   * холлом, смотрит не в холл, а сквозь полтора десятка шахтных стенок.
+   * Поэтому в плане шахта и верхние площадки выключаются целиком,
+   * а кабина остаётся видна, только пока она внизу.
+   */
+  setTopView(on) {
+    if (this.topView === on) return;
+    this.topView = on;
+
+    this.shaftGroup.visible = !on;
+    this.upperGroup.visible = !on;
+    // Сверху потолок кабины — просто белая крышка: снимаем его,
+    // чтобы в плане было видно, сколько человек внутри.
+    this.cabinCeiling.visible = !on;
+    this.lampMesh.visible = !on;
+    if (!on) this.cabin.visible = true;
   }
 
   /** Красная вспышка «Пропущено» над дверью проезжаемого этажа. */
@@ -716,6 +763,10 @@ export class Elevator {
     const y = this.prevPosition + (this.position - this.prevPosition) * alpha;
     this.renderY = y + this.bounce;
     this.#applyCabinPosition();
+
+    // В плане кабина видна, только пока она в пределах первого этажа:
+    // выше она превращается в белую крышу поперёк всего вида.
+    if (this.topView) this.cabin.visible = this.renderY < HALL.height * 0.5;
 
     const phase = this.prevDoorPhase + (this.doorPhase - this.prevDoorPhase) * alpha;
     this.cabinDoors.set(phase);

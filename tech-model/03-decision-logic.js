@@ -31,10 +31,11 @@ const chart = require('./chart-helper');
 const io = require('./io');
 
 // Ширина пограничной зоны в местах
-const BAND = 2;
+const BAND = PARAMS.dispatch.band;
 
-// Запас мест по умолчанию; оптимальное значение ищет 07-optimization.js
-const DEFAULT_MARGIN = 1;
+// Запас мест по умолчанию. Берётся из общих параметров (dispatch.safetyMargin),
+// куда записан оптимум, найденный 07-optimization.js.
+const DEFAULT_MARGIN = PARAMS.dispatch.safetyMargin;
 
 const TRIALS = 20000;
 

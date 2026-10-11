@@ -1655,3 +1655,395 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   margin: 0;
   accent-color: var(--color-accent);
 }
+
+/* ══ Прогноз, кольцо ожидания, заглушки и новые модалки ═══ */
+
+/* ── Строка тенденции под плашкой очереди ───────────────── */
+.trendline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0 2px;
+  font-size: 13.5px;
+  letter-spacing: -0.1px;
+  color: var(--color-busy);
+}
+
+.trendline[data-trend='falling'] { color: var(--color-ok); }
+
+/* ── Кольцо обратного отсчёта ───────────────────────────── */
+.wait {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wait__ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+}
+
+.wait__ring svg {
+  width: 100%;
+  height: 100%;
+  /* Отсчёт начинается сверху, а не справа */
+  transform: rotate(-90deg);
+}
+
+.wait__track,
+.wait__arc {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.wait__track { stroke: var(--color-fill); }
+
+.wait__arc {
+  stroke: var(--color-accent);
+  /* Длина окружности при r = 34. Смещение задаёт app.js. */
+  stroke-dasharray: 213.6;
+  stroke-dashoffset: 213.6;
+  transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+}
+
+.wait__count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+
+.wait__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wait__state {
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.1px;
+}
+
+.wait__state[hidden] { display: none; }
+
+/* Прогноз истёк: кабина должна быть здесь */
+.wait__ring[data-state='done'] .wait__arc { stroke: var(--color-ok); }
+.wait__ring[data-state='done'] .wait__count { color: var(--color-ok); }
+.wait__ring[data-state='done'] ~ .wait__body .wait__state { color: var(--color-ok); }
+
+/* Прогноз превышен в полтора раза: лифт явно задерживается */
+.wait__ring[data-state='late'] .wait__arc {
+  stroke: var(--color-full);
+  animation: ring-pulse 1.3s ease-in-out infinite;
+}
+
+.wait__ring[data-state='late'] .wait__count { color: var(--color-full); }
+.wait__ring[data-state='late'] ~ .wait__body .wait__state { color: var(--color-full); }
+
+@keyframes ring-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wait__arc { transition: none; animation: none; }
+}
+
+/* ── Карточка прогноза на экране лифта ──────────────────── */
+.forecast {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.forecast__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.forecast__row:last-child { border-bottom: none; }
+
+.forecast__when {
+  flex: 0 0 auto;
+  font-size: 13.5px;
+  color: var(--label-2);
+}
+
+.forecast__row--now .forecast__when { color: var(--label); }
+
+.forecast__value {
+  min-width: 0;
+  text-align: right;
+  font-size: 15px;
+  letter-spacing: -0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast__row--now .forecast__value { font-weight: 600; }
+
+.forecast__warmup {
+  display: block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--label-3);
+}
+
+/* Стрелка тенденции рядом с заголовком карточки */
+.trend-mark { color: var(--color-full); }
+.trend-mark[data-trend='falling'] { color: var(--color-ok); }
+.trend-mark[hidden] { display: none; }
+
+/* ── Заглушки с внутренней структурой ───────────────────── */
+.skeleton__line {
+  display: block;
+  border-radius: 6px;
+  background: var(--skeleton);
+}
+
+/* Внутренности карточки-заглушки повторяют настоящую карточку */
+.skeleton--tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 232px;
+  padding: 16px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-card);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton--tile .skeleton__line:nth-child(1) { width: 56%; height: 14px; }
+.skeleton--tile .skeleton__line:nth-child(2) { width: 42%; height: 34px; margin-top: 6px; }
+.skeleton--tile .skeleton__line:nth-child(3) { width: 72%; height: 12px; }
+.skeleton--tile .skeleton__line:nth-child(4) { width: 64%; height: 12px; }
+.skeleton--tile .skeleton__line:nth-child(5) {
+  width: 44%;
+  height: 30px;
+  border-radius: 999px;
+  margin-top: auto;
+}
+
+.detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton--camera  { height: 196px; }
+.skeleton--metric  { height: 104px; }
+.skeleton--compare { height: 148px; }
+
+/* ── Две кнопки в ряд на экране лифта ───────────────────── */
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.actions .button { width: 100%; }
+
+@media (max-width: 360px) {
+  .actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Модалка «поделиться» ───────────────────────────────── */
+.share__preview {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  max-height: 180px;
+  overflow: auto;
+  background: var(--color-fill);
+  border-radius: var(--r-inner);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--label-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.share__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* ── Строка-ссылка и карточка подписки в настройках ─────── */
+.linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  background: var(--color-fill);
+  border-radius: var(--r-inner);
+  color: var(--label);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.linkrow__text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.linkrow__go { color: var(--label-3); }
+
+.sheet__hint {
+  margin: -2px 0 0;
+  padding: 0 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--label-3);
+}
+
+.promo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--tint-accent);
+  border-radius: var(--r-inner);
+}
+
+.promo__title { font-size: 16px; letter-spacing: -0.3px; }
+
+.promo__text {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.promo .button { margin-top: 4px; }
+
+/* ══ Планировщик выхода ══════════════════════════════════ */
+
+.plan__intro {
+  margin: 0 2px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.field__input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  border-radius: var(--r-inner);
+  color: var(--label);
+  font: inherit;
+  font-size: 16px;            /* меньше 16px — iOS зумит страницу при фокусе */
+  line-height: 1.2;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* У select нужна своя стрелка: системную мы сняли через appearance */
+select.field__input {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--label-3) 50%),
+    linear-gradient(135deg, var(--label-3) 50%, transparent 50%);
+  background-position: right 18px center, right 13px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.button--wide { width: 100%; }
+
+.plan__result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.plan__status {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  background: var(--tint-ok);
+  color: var(--color-ok);
+}
+
+.plan__result[data-status='soon'] .plan__status {
+  background: var(--tint-busy);
+  color: var(--color-busy);
+}
+
+.plan__result[data-status='now'] .plan__status {
+  background: var(--tint-full);
+  color: var(--color-full);
+}
+
+.plan__exit {
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -1.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan__explain {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+.plan__source {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--label-3);
+}
+
+.plan__result .button { margin-top: 6px; }
+
+#plan-back { margin-top: 14px; }

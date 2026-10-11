@@ -11,13 +11,15 @@
     "start:max": "node \"tiu go max/index.js\"",
     "screenshots": "node screenshots/capture.js",
     "mockup": "node screenshots/capture.js --mockup-only",
+    "check:params": "node scripts/check-params.js",
     "3d:dev": "vite 3d-sim",
     "3d:build": "vite build 3d-sim",
     "3d:preview": "vite preview 3d-sim",
     "docs:charts": "node scripts/generate-charts.js",
     "docs:word": "node scripts/generate-word.js",
     "docs:excel": "node scripts/generate-excel.js",
-    "docs:all": "npm run docs:charts && npm run docs:word && npm run docs:excel",
+    "docs:deck": "node scripts/generate-presentation.js",
+    "docs:all": "npm run docs:charts && npm run docs:word && npm run docs:excel && npm run docs:deck",
     "math:queue": "node math-model/01-queueing-model.js",
     "math:sim": "node math-model/02-simulation.js",
     "math:utility": "node math-model/03-utility-model.js",
@@ -25,7 +27,8 @@
     "math:sensitivity": "node math-model/05-sensitivity.js",
     "math:optimize": "node math-model/06-optimization.js",
     "math:report": "node math-model/07-report.js",
-    "math:all": "npm run math:physics && npm run math:queue && npm run math:sim && npm run math:utility && npm run math:sensitivity && npm run math:optimize && npm run math:report",
+    "math:excel": "node math-model/08-excel.js",
+    "math:all": "npm run math:physics && npm run math:queue && npm run math:sim && npm run math:utility && npm run math:sensitivity && npm run math:optimize && npm run math:excel && npm run math:report",
     "tech:camera": "node tech-model/01-camera-model.js",
     "tech:errors": "node tech-model/02-detection-errors.js",
     "tech:decision": "node tech-model/03-decision-logic.js",
@@ -49,7 +52,8 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "pptxgenjs": "^4.0.1"
   },
   "engines": {
     "node": ">=18"

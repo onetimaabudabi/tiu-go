@@ -1,18 +1,25 @@
 /**
- * Холл первого этажа: пол, стены с проёмами, потолок, зоны ожидания.
+ * Лифтовой холл первого этажа: пол, стены с проёмами, потолок, зоны ожидания.
  *
- * Шесть лифтовых порталов строит elevator.js — здесь только стена,
- * в которой для них вырезаны проёмы, и всё остальное помещение.
+ * Планировка — как в корпусе 7: не зал с лифтами по одной стене, а коридор,
+ * в котором шахты стоят друг против друга, по три с каждой стороны. Вход
+ * с торца: входящий видит сразу обе группы, слева 1-2-3, справа 4-5-6.
+ *
+ * Шесть лифтовых порталов строит elevator.js — здесь только стены,
+ * в которых для них вырезаны проёмы, и всё остальное помещение.
  * Зоны ожидания умеют менять цвет: это тепловая карта плотности.
  */
 
 import * as THREE from 'three';
-import { BUILDING, CABIN, HALL, PALETTE, liftX } from '../logic/params.js';
+import {
+  BUILDING, ELEVATORS, BANKS, HALL, PALETTE, liftAnchor
+} from '../logic/params.js';
 import { tileTexture, wallTexture, signTexture } from './textures.js';
 
 const DOOR_HEIGHT = 2.1;
+const DOOR_WIDTH = ELEVATORS.doorWidth;
 
-/** Прямоугольник со скруглением не нужен — простая рамка для Shape. */
+/** Прямоугольная рамка для Shape. */
 function rect(shape, x0, y0, x1, y1) {
   shape.moveTo(x0, y0);
   shape.lineTo(x1, y0);
@@ -34,31 +41,32 @@ export class Hall {
     this.group.name = 'hall';
     scene.add(this.group);
 
-    this.waitZones = [];
+    // Зоны ожидания по номеру лифта
+    this.waitZones = new Map();
 
     this.#floor();
     this.#porch();
+    this.#stairLanding();
     this.#walls();
     this.#ceiling();
     this.#waitZonesBuild();
     this.#signs();
   }
 
-  /** Пол в плитку 0.6 × 0.6 м. */
+  /** Пол коридора в плитку 0.6 × 0.6 м. */
   #floor() {
-    const repeatX = HALL.width / HALL.tile;
-    const repeatY = HALL.depth / HALL.tile;
+    const repeatX = HALL.length / HALL.tile;
+    const repeatZ = HALL.corridor / HALL.tile;
 
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALL.width, HALL.depth),
+      new THREE.PlaneGeometry(HALL.length, HALL.corridor),
       new THREE.MeshStandardMaterial({
-        map: tileTexture(PALETTE.hallFloorA, PALETTE.hallFloorB, repeatX, repeatY),
+        map: tileTexture(PALETTE.hallFloorA, PALETTE.hallFloorB, repeatX, repeatZ),
         roughness: 0.75,
         metalness: 0.05
       })
     );
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(0, 0, 0);
     mesh.receiveShadow = true;
     this.floorMesh = mesh;
     this.group.add(mesh);
@@ -73,10 +81,11 @@ export class Hall {
    */
   #porch() {
     const depth = 3.2;
-    const x0 = HALL.width / 2;
+    const x0 = HALL.entranceX;
+    const width = HALL.corridor + 1.6;
 
     const slab = new THREE.Mesh(
-      new THREE.BoxGeometry(depth, 0.12, HALL.depth),
+      new THREE.BoxGeometry(depth, 0.12, width),
       new THREE.MeshStandardMaterial({ color: 0x8e8a84, roughness: 0.95, metalness: 0.02 })
     );
     slab.position.set(x0 + depth / 2, -0.06, 0);
@@ -90,20 +99,58 @@ export class Hall {
         color: 0x5f666c, roughness: 0.6, metalness: 0.35
       })
     );
-    canopy.position.set(x0 + depth * 0.4, 2.95, HALL.entranceZ);
+    canopy.position.set(x0 + depth * 0.4, HALL.height - 0.15, 0);
     canopy.castShadow = true;
     this.group.add(canopy);
 
     for (const dz of [-1, 1]) {
       const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.07, 0.07, 2.95, 10),
+        new THREE.CylinderGeometry(0.07, 0.07, HALL.height - 0.15, 10),
         new THREE.MeshStandardMaterial({ color: 0x6f757a, metalness: 0.7, roughness: 0.4 })
       );
       post.position.set(
-        x0 + depth * 0.72, 1.47,
-        HALL.entranceZ + dz * (HALL.entranceWidth / 2 + 0.4)
+        x0 + depth * 0.72, (HALL.height - 0.15) / 2,
+        dz * (HALL.entranceWidth / 2 + 0.4)
       );
       this.group.add(post);
+    }
+  }
+
+  /**
+   * Площадка за проёмом лестницы.
+   *
+   * Тот, кто не дождался лифта, уходит через этот проём и исчезает уже
+   * за стеной холла. Без площадки последние шаги он делал бы по воздуху.
+   */
+  #stairLanding() {
+    const side = HALL.stairsSide;
+    const depth = 2.0;
+
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(HALL.stairsWidth + 0.8, 0.12, depth),
+      new THREE.MeshStandardMaterial({ color: 0x8a8681, roughness: 0.95, metalness: 0.02 })
+    );
+    slab.position.set(
+      HALL.stairsX, -0.06,
+      side * (HALL.doorPlane + depth / 2)
+    );
+    slab.receiveShadow = true;
+    this.group.add(slab);
+
+    // Первые ступени — видно, что проём ведёт вверх, а не в пустоту
+    const stepMat = new THREE.MeshStandardMaterial({
+      color: 0x9a948c, roughness: 0.9, metalness: 0.03
+    });
+    for (let i = 0; i < 5; i += 1) {
+      const step = new THREE.Mesh(
+        new THREE.BoxGeometry(HALL.stairsWidth, 0.16, 0.3), stepMat
+      );
+      step.position.set(
+        HALL.stairsX, 0.08 + i * 0.16,
+        side * (HALL.doorPlane + 0.9 + i * 0.3)
+      );
+      step.receiveShadow = true;
+      this.group.add(step);
     }
   }
 
@@ -121,77 +168,87 @@ export class Hall {
 
   #walls() {
     const mat = this.#wallMaterial();
+    const half = HALL.length / 2;
 
-    // ---- Дальняя стена с шестью лифтовыми проёмами ----
-    const back = new THREE.Shape();
-    rect(back, -HALL.width / 2, 0, HALL.width / 2, HALL.height);
+    // ---- Две стены с лифтовыми проёмами ----
+    //
+    // Стена стоит на постоянном Z, поэтому фигура лежит прямо в плоскости
+    // XY: местный X — это мировой X, поворачивать ничего не нужно.
+    for (const bank of Object.values(BANKS)) {
+      const shape = new THREE.Shape();
+      rect(shape, -half, 0, half, HALL.height);
 
-    for (let n = 1; n <= 6; n += 1) {
-      const x = liftX(n);
-      back.holes.push(hole(x - CABIN.width / 2, 0, x + CABIN.width / 2, DOOR_HEIGHT));
+      for (const number of bank.numbers) {
+        const x = liftAnchor(number).x;
+        shape.holes.push(hole(x - DOOR_WIDTH / 2, 0, x + DOOR_WIDTH / 2, DOOR_HEIGHT));
+      }
+
+      // Проём на лестницу — в стене той группы, где он есть по плану
+      if (bank.side === HALL.stairsSide) {
+        shape.holes.push(hole(
+          HALL.stairsX - HALL.stairsWidth / 2, 0,
+          HALL.stairsX + HALL.stairsWidth / 2, 2.2
+        ));
+      }
+
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+      mesh.position.set(0, 0, bank.side * HALL.doorPlane);
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
 
-    const backMesh = new THREE.Mesh(new THREE.ShapeGeometry(back), mat);
-    backMesh.position.set(0, 0, HALL.liftWall);
-    backMesh.receiveShadow = true;
-    this.group.add(backMesh);
-
-    // ---- Правая стена: вход и проём на лестницу ----
-    // Локальный X фигуры превращается в мировой Z после поворота на -90°.
-    const right = new THREE.Shape();
-    rect(right, -HALL.depth / 2, 0, HALL.depth / 2, HALL.height);
+    // ---- Торец со входом ----
+    // Стена стоит на постоянном X: после поворота на −90° местный X
+    // фигуры становится мировым Z.
+    const front = new THREE.Shape();
+    rect(front, -HALL.corridor / 2, 0, HALL.corridor / 2, HALL.height);
 
     const eHalf = HALL.entranceWidth / 2;
-    right.holes.push(hole(HALL.entranceZ - eHalf, 0, HALL.entranceZ + eHalf, 2.4));
-    right.holes.push(hole(HALL.stairsZ - 1, 0, HALL.stairsZ + 1, 2.2));
+    front.holes.push(hole(-eHalf, 0, eHalf, HALL.entranceHeight));
 
-    const rightMesh = new THREE.Mesh(new THREE.ShapeGeometry(right), mat);
-    rightMesh.rotation.y = -Math.PI / 2;
-    rightMesh.position.set(HALL.width / 2, 0, 0);
-    rightMesh.receiveShadow = true;
-    this.group.add(rightMesh);
+    const frontMesh = new THREE.Mesh(new THREE.ShapeGeometry(front), mat);
+    frontMesh.rotation.y = -Math.PI / 2;
+    frontMesh.position.set(HALL.entranceX, 0, 0);
+    frontMesh.receiveShadow = true;
+    this.group.add(frontMesh);
 
-    // ---- Левая стена: глухая ----
-    const left = new THREE.Shape();
-    rect(left, -HALL.depth / 2, 0, HALL.depth / 2, HALL.height);
-
-    const leftMesh = new THREE.Mesh(new THREE.ShapeGeometry(left), mat);
-    leftMesh.rotation.y = Math.PI / 2;
-    leftMesh.position.set(-HALL.width / 2, 0, 0);
-    leftMesh.receiveShadow = true;
-    this.group.add(leftMesh);
-
-    // ---- Передняя стена: витраж, чтобы холл просматривался снаружи ----
-    const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALL.width, HALL.height),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xbcd4de,
-        transparent: true,
-        opacity: 0.12,
-        roughness: 0.08,
-        metalness: 0.0,
-        transmission: 0.0,
-        side: THREE.DoubleSide
-      })
-    );
-    glass.position.set(0, HALL.height / 2, HALL.depth / 2);
-    this.group.add(glass);
-
-    // Импосты витража
-    const mullionMat = new THREE.MeshStandardMaterial({
-      color: 0x6f757a, metalness: 0.7, roughness: 0.4
+    // Витраж по обе стороны от входа — холл просматривается с улицы
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xbcd4de,
+      transparent: true,
+      opacity: 0.12,
+      roughness: 0.08,
+      metalness: 0.0,
+      side: THREE.DoubleSide
     });
-    const mullionGeo = new THREE.BoxGeometry(0.07, HALL.height, 0.07);
-    for (let i = -2; i <= 2; i += 1) {
-      const m = new THREE.Mesh(mullionGeo, mullionMat);
-      m.position.set(i * (HALL.width / 5), HALL.height / 2, HALL.depth / 2);
-      this.group.add(m);
+
+    const glassWidth = (HALL.corridor - HALL.entranceWidth) / 2;
+    for (const dz of [-1, 1]) {
+      const glass = new THREE.Mesh(
+        new THREE.PlaneGeometry(glassWidth, HALL.entranceHeight), glassMat
+      );
+      glass.rotation.y = -Math.PI / 2;
+      glass.position.set(
+        HALL.entranceX - 0.02, HALL.entranceHeight / 2,
+        dz * (eHalf + glassWidth / 2)
+      );
+      this.group.add(glass);
     }
+
+    // ---- Глухой торец в глубине холла ----
+    const back = new THREE.Shape();
+    rect(back, -HALL.corridor / 2, 0, HALL.corridor / 2, HALL.height);
+
+    const backMesh = new THREE.Mesh(new THREE.ShapeGeometry(back), mat);
+    backMesh.rotation.y = Math.PI / 2;
+    backMesh.position.set(-half, 0, 0);
+    backMesh.receiveShadow = true;
+    this.group.add(backMesh);
   }
 
   #ceiling() {
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALL.width, HALL.depth),
+      new THREE.PlaneGeometry(HALL.length, HALL.corridor),
       new THREE.MeshStandardMaterial({
         color: PALETTE.hallCeiling, roughness: 0.95, metalness: 0.0,
         side: THREE.DoubleSide
@@ -204,26 +261,37 @@ export class Hall {
 
     this.lamps = [];
 
-    // Потолочные светильники — светящиеся панели (сам свет в lighting.js)
+    // Потолочные светильники: продольные панели по коридору
+    // (сам свет — в lighting.js)
     const lampGeo = new THREE.PlaneGeometry(1.6, 0.22);
     const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff3dd });
+    const rows = [-1, 0, 1];
+    const columns = Math.floor(HALL.length / 2.4);
 
-    for (let row = -1; row <= 1; row += 1) {
-      for (let col = -2; col <= 2; col += 1) {
+    for (const row of rows) {
+      for (let col = 0; col < columns; col += 1) {
         const lamp = new THREE.Mesh(lampGeo, lampMat);
         lamp.rotation.x = Math.PI / 2;
-        lamp.position.set(col * 2.4, HALL.height - 0.02, row * 2.4);
+        lamp.position.set(
+          -HALL.length / 2 + 1.2 + col * 2.4,
+          HALL.height - 0.02,
+          row * (HALL.corridor / 2 - 0.9)
+        );
         this.lamps.push(lamp);
         this.group.add(lamp);
       }
     }
   }
 
-  /** Жёлтые квадраты перед дверями — они же тепловая карта. */
+  /** Жёлтые прямоугольники перед дверями — они же тепловая карта. */
   #waitZonesBuild() {
-    const geo = new THREE.PlaneGeometry(HALL.waitZoneSize, HALL.waitZoneSize);
+    const geo = new THREE.PlaneGeometry(HALL.waitZoneWidth, HALL.waitZoneDepth);
 
-    for (let n = 1; n <= 6; n += 1) {
+    for (let n = 1; n <= ELEVATORS.total; n += 1) {
+      const a = liftAnchor(n);
+      // Дальний край зоны отстоит от створок на waitZoneGap
+      const z = a.z - a.side * (HALL.waitZoneGap + HALL.waitZoneDepth / 2);
+
       const mat = new THREE.MeshBasicMaterial({
         color: PALETTE.waitZone,
         transparent: true,
@@ -233,7 +301,7 @@ export class Hall {
 
       const zone = new THREE.Mesh(geo, mat);
       zone.rotation.x = -Math.PI / 2;
-      zone.position.set(liftX(n), 0.02, HALL.waitZoneZ);
+      zone.position.set(a.x, 0.02, z);
       zone.renderOrder = 1;
       this.group.add(zone);
 
@@ -243,10 +311,10 @@ export class Hall {
         new THREE.LineBasicMaterial({ color: PALETTE.waitZone, transparent: true, opacity: 0.6 })
       );
       edge.rotation.x = -Math.PI / 2;
-      edge.position.set(liftX(n), 0.024, HALL.waitZoneZ);
+      edge.position.set(a.x, 0.024, z);
       this.group.add(edge);
 
-      this.waitZones.push({ mesh: zone, material: mat, edge });
+      this.waitZones.set(n, { mesh: zone, material: mat, edge });
     }
   }
 
@@ -255,7 +323,7 @@ export class Hall {
    * Зелёный — свободно, жёлтый — очередь, красный — толпа.
    */
   setHeat(number, waiting) {
-    const zone = this.waitZones[number - 1];
+    const zone = this.waitZones.get(number);
     if (!zone) return;
 
     const full = Math.min(1, waiting / 12);
@@ -289,31 +357,55 @@ export class Hall {
       new THREE.MeshBasicMaterial({ map: signTexture(text, opts), toneMapped: false })
     );
 
-    // Над входом
+    // Над входом, со стороны холла
     const entrance = make('ВХОД', 1.4, 0.34, {
       width: 512, height: 128, bg: '#1b4d2e', fg: '#d8f5e4',
       font: 'bold 72px system-ui, sans-serif', cacheKey: 'sign:entrance'
     });
     entrance.rotation.y = -Math.PI / 2;
-    entrance.position.set(HALL.width / 2 - 0.04, 2.6, HALL.entranceZ);
+    entrance.position.set(HALL.entranceX - 0.04, HALL.entranceHeight + 0.3, 0);
     this.group.add(entrance);
 
-    // Над проёмом лестницы
+    // Над проёмом лестницы: табличка смотрит в коридор
     const stairs = make('ЛЕСТНИЦА', 1.3, 0.3, {
       width: 512, height: 128, bg: '#2b2f33', fg: '#e8edf2',
       font: 'bold 60px system-ui, sans-serif', cacheKey: 'sign:stairs'
     });
-    stairs.rotation.y = -Math.PI / 2;
-    stairs.position.set(HALL.width / 2 - 0.04, 2.4, HALL.stairsZ);
+    stairs.rotation.y = HALL.stairsSide > 0 ? Math.PI : 0;
+    stairs.position.set(
+      HALL.stairsX, 2.45,
+      HALL.stairsSide * (HALL.doorPlane - 0.04)
+    );
     this.group.add(stairs);
 
-    // Название корпуса на левой стене
-    const title = make(BUILDING.name, 4.2, 0.5, {
+    // Название корпуса на глухом торце
+    const title = make(BUILDING.name, 3.4, 0.4, {
       width: 1024, height: 128, bg: '#1a1d21', fg: '#cfd6dd',
       font: 'bold 52px system-ui, sans-serif', cacheKey: 'sign:building'
     });
     title.rotation.y = Math.PI / 2;
-    title.position.set(-HALL.width / 2 + 0.04, 2.45, 0);
+    title.position.set(-HALL.length / 2 + 0.04, 2.45, 0);
     this.group.add(title);
+
+    // Указатели групп: какие номера на этой стороне. Состав берётся
+    // из параметров, поэтому таблички не разойдутся с планировкой.
+    for (const bank of Object.values(BANKS)) {
+      const numbers = bank.numbers.join(' · ');
+      const plate = make(`ЛИФТЫ ${numbers}`, 1.9, 0.3, {
+        width: 640, height: 112, bg: '#1a1d21', fg: '#9fb4c7',
+        font: 'bold 54px system-ui, sans-serif',
+        cacheKey: `sign:bank:${bank.id}:${numbers}`
+      });
+      // Над средней шахтой группы: там табличку не перекрывают ни
+      // указатель лестницы, ни козырёк входа.
+      const middle = bank.numbers[Math.floor(bank.numbers.length / 2)];
+
+      plate.rotation.y = bank.side > 0 ? Math.PI : 0;
+      plate.position.set(
+        liftAnchor(middle).x, 2.62,
+        bank.side * (HALL.doorPlane - 0.04)
+      );
+      this.group.add(plate);
+    }
   }
 }
