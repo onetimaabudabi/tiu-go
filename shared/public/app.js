@@ -124,6 +124,19 @@
     channelOpen: $('channel-open'),
     channelPromo: $('channel-promo'),
     channelButton: $('channel-button'),
+
+    // Экран «О проекте»
+    about: $('screen-about'),
+    aboutLink: $('about-link'),
+    aboutHome: $('about-home'),
+    aboutAddress: $('about-address'),
+    aboutChannel: $('about-channel'),
+    aboutChannelButton: $('about-channel-button'),
+    aboutFloors: $('about-floors'),
+    aboutLifts: $('about-lifts'),
+    aboutWorking: $('about-working'),
+    aboutCamera: $('about-camera'),
+    aboutRefresh: $('about-refresh'),
     plannerLink: $('planner-link'),
     themeColor: $('theme-color'),
     home: $('screen-home'),
@@ -321,15 +334,15 @@
 
     // Системная кнопка «назад» в Telegram
     if (tg && tg.BackButton && tg.BackButton.onClick) {
-      try { tg.BackButton.onClick(closeDetail); } catch (e) {}
+      try { tg.BackButton.onClick(closeTopScreen); } catch (e) {}
     }
 
     // Системная кнопка «назад» в MAX.
     // TODO: сверить имя события и объект с документацией — https://dev.max.ru/docs
     if (mx) {
       try {
-        if (mx.BackButton && mx.BackButton.onClick) mx.BackButton.onClick(closeDetail);
-        else if (typeof mx.on === 'function') mx.on('back', closeDetail);
+        if (mx.BackButton && mx.BackButton.onClick) mx.BackButton.onClick(closeTopScreen);
+        else if (typeof mx.on === 'function') mx.on('back', closeTopScreen);
       } catch (e) {}
     }
 
@@ -1963,6 +1976,7 @@
 
     el.channelOpen.hidden = !has;
     el.channelPromo.hidden = !has;
+    el.aboutChannel.hidden = !has;
   }
 
   function openChannel() {
@@ -2211,6 +2225,18 @@
     }
   }
 
+  /**
+   * Что закрывает системная стрелка «назад».
+   *
+   * Экранов поверх главного теперь два — лифт и «О проекте», — и
+   * кнопка в шапке Telegram или MAX одна на оба. Поэтому она закрывает
+   * тот, который сейчас открыт, а не только экран лифта.
+   */
+  function closeTopScreen() {
+    if (state.openId !== null) closeDetail();
+    else if (!el.about.hidden) closeAbout();
+  }
+
   /** Номер лифта из адреса вида index.html#lift-3, если он там есть. */
   function readLiftHash() {
     var match = /^#lift-(\d+)$/.exec(window.location.hash || '');
@@ -2300,6 +2326,7 @@
     }
 
     el.detail.hidden = true;
+    el.about.hidden = true;
     el.home.hidden = false;
     window.scrollTo(0, 0);
     toggleHostBackButton(false);
@@ -2336,6 +2363,60 @@
   function render() {
     if (state.openId !== null) renderDetail();
     else renderHome();
+
+    // Экран «О проекте» живёт на тех же данных: пока он открыт,
+    // цифры на нём обновляются вместе со всем остальным.
+    if (!el.about.hidden) renderAbout();
+  }
+
+  // ---------- Экран «О проекте» ----------
+  //
+  // Цифры берутся из того же ответа /api/status, что и главный экран:
+  // этажность, число лифтов, сколько на ходу, этаж с камерами и период
+  // обновления. Руками здесь не записано ничего — поменяется корпус
+  // в shared/params.json, поменяется и этот экран.
+
+  function renderAbout() {
+    setText(el.aboutAddress, state.address || t('about.title'));
+
+    setText(el.aboutFloors, state.floors ? String(state.floors) : '—');
+    setText(el.aboutLifts, state.total ? String(state.total) : '—');
+
+    setText(el.aboutWorking, state.total
+      ? t('about.workingValue', { working: state.working, total: state.total })
+      : '—');
+
+    setText(el.aboutCamera, state.cameraFloor ? String(state.cameraFloor) : '—');
+
+    setText(el.aboutRefresh, t('about.refreshValue', {
+      seconds: Math.max(1, Math.round((state.refreshMs || 3000) / 1000))
+    }));
+  }
+
+  function showAbout() {
+    closeSheet();
+    renderAbout();
+
+    el.home.hidden = true;
+    el.detail.hidden = true;
+    el.about.hidden = false;
+    window.scrollTo(0, 0);
+    toggleHostBackButton(true);
+    animateScreen(el.about, 'screen--push');
+
+    // Своя запись в истории: системная стрелка «назад» в Telegram и MAX
+    // и свайп в браузере должны закрывать экран, а не всё приложение.
+    try { window.history.pushState({ tiuGoAbout: true }, ''); } catch (e) {}
+  }
+
+  function closeAbout() {
+    if (el.about.hidden) return;
+
+    if (window.history.state && window.history.state.tiuGoAbout) {
+      window.history.back();   // дальше сработает popstate
+    } else {
+      showHome();
+    }
   }
 
   // ---------- Кэш ----------
@@ -2499,7 +2580,7 @@
 
   // Системный жест «назад» и кнопка браузера
   window.addEventListener('popstate', function () {
-    if (state.openId !== null) showHome();
+    if (state.openId !== null || !el.about.hidden) showHome();
   });
 
   // Запасные способы вернуться там, где системной кнопки нет:
@@ -2602,6 +2683,26 @@
   // Канал проекта: иконка в шапке и кнопка в настройках ведут в одно место
   el.channelOpen.addEventListener('click', openChannel);
   el.channelButton.addEventListener('click', openChannel);
+  el.aboutChannelButton.addEventListener('click', openChannel);
+
+  el.aboutLink.addEventListener('click', function () {
+    haptic();
+    showAbout();
+  });
+
+  // Там, где системной стрелки нет (обычный браузер), заголовок экрана
+  // работает кнопкой «назад» — так же, как на экране лифта.
+  el.aboutHome.addEventListener('click', function () {
+    haptic();
+    closeAbout();
+  });
+
+  el.aboutHome.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeAbout();
+    }
+  });
 
   // Планировщик — отдельная страница, ссылке хватает обычного перехода.
   // Нужен только отклик на тап, как у остальных кнопок.

@@ -113,6 +113,71 @@
     </div>
   </section>
 
+  <!-- ---------- Режим «вид с камеры наблюдения» ---------- -->
+
+  <!-- Рамки детекции: canvas поверх сцены, на всё окно -->
+  <canvas id="detect" class="detect" hidden></canvas>
+
+  <!-- Всё, что живёт внутри кадра 16:9. Размер ставит ui/camera-ui.js -->
+  <div class="camframe" id="cam-frame" hidden>
+    <div class="cctv" id="cctv">
+      <div class="cctv__noise"></div>
+      <div class="cctv__scan"></div>
+      <div class="cctv__vignette"></div>
+      <i class="cctv__mark cctv__mark--tl"></i>
+      <i class="cctv__mark cctv__mark--tr"></i>
+      <i class="cctv__mark cctv__mark--bl"></i>
+      <i class="cctv__mark cctv__mark--br"></i>
+      <div class="cctv__footer" id="cctv-footer">REC · 30 FPS · 1920x1080</div>
+    </div>
+
+    <!-- Счётчики, как на табло видеонаблюдения -->
+    <section class="hud" id="cam-hud">
+      <div class="hud__top">
+        <span class="hud__rec"><i></i>REC</span>
+        <span class="hud__clock" id="cam-clock">00:00:00</span>
+      </div>
+      <div class="hud__title" id="cam-title">CAM-01 · Холл 1 этажа</div>
+      <div class="hud__count">
+        <span class="hud__count-label">В кадре:</span>
+        <b id="cam-count">0</b>
+        <span id="cam-count-word">человек</span>
+      </div>
+      <div class="hud__detect" id="cam-detect">детектор насчитал: 0</div>
+      <dl class="hud__list" id="cam-queues"></dl>
+    </section>
+
+    <!-- Мини-карта зоны ожидания -->
+    <section class="minimap" id="cam-minimap">
+      <div class="minimap__title">Зона ожидания · сверху</div>
+      <canvas id="minimap-canvas" width="200" height="150"></canvas>
+    </section>
+  </div>
+
+  <!-- Панель режима камеры: только то, что относится к кадру -->
+  <section class="panel panel--cam" id="panel-cam" hidden>
+    <div class="panel__body">
+      <div class="row row--main">
+        <button class="btn btn--primary" id="cam-exit" type="button">← Выйти из режима камеры</button>
+      </div>
+
+      <div class="row row--opts">
+        <label class="check"><input type="checkbox" id="cam-opt-boxes" checked /> Рамки детекции</label>
+        <label class="check"><input type="checkbox" id="cam-opt-ids" checked /> ID людей</label>
+        <label class="check"><input type="checkbox" id="cam-opt-conf" checked /> Уверенность</label>
+        <label class="check"><input type="checkbox" id="cam-opt-cctv" checked /> Эффект CCTV</label>
+        <label class="check"><input type="checkbox" id="cam-opt-multi" /> 4 камеры (M)</label>
+      </div>
+
+      <label class="slider" for="cam-confidence">
+        <span class="slider__label">
+          Уверенность детектора <b id="cam-confidence-value">0.92</b>
+        </span>
+        <input type="range" id="cam-confidence" min="50" max="99" step="1" value="92" />
+      </label>
+    </div>
+  </section>
+
   <!-- ---------- Сравнение режимов ---------- -->
   <div class="overlay" id="compare-overlay" hidden>
     <section class="panel panel--modal" id="panel-compare">

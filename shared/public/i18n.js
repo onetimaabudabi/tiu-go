@@ -220,6 +220,23 @@
       'subscribe.button': 'Открыть канал',
       'subscribe.missing': 'Ссылка на канал пока не настроена',
 
+      // ---------- Экран «О проекте» ----------
+      'about.open': 'О проекте',
+      'about.title': 'О проекте',
+      'about.channelText': 'Бета-версия, новые корпуса и всё, что мы чиним по дороге, — сначала в канале, потом везде.',
+      'about.what': 'Что это',
+      'about.whatText': 'TIU GO показывает, свободны ли лифты, пока ты ещё идёшь к корпусу. Сколько человек в кабине, на каком она этаже и сколько ждать — видно до того, как встанешь в очередь.',
+      'about.facts': 'Коротко о корпусе',
+      'about.floors': 'Этажей',
+      'about.lifts': 'Лифтов',
+      'about.working': 'Работают',
+      'about.workingValue': '{working} из {total}',
+      'about.camera': 'Камеры на этаже',
+      'about.refresh': 'Обновление',
+      'about.refreshValue': 'раз в {seconds} с',
+      'about.data': 'Откуда данные',
+      'about.dataText': 'Сейчас приложение работает на тестовых данных: камеры в кабинах подключим позже. Ожидание считается по тем же формулам, что и в моделях проекта, — меняются только исходные числа.',
+
       // ---------- Вибрация ----------
       'notif.haptics': 'Вибрация при событиях',
       'notif.hapticsHint': 'Короткий отклик, когда лифт подходит, приезжает или ломается',
@@ -417,6 +434,23 @@
       'subscribe.text': 'Subscribe to be the first to know about the beta and updates',
       'subscribe.button': 'Open channel',
       'subscribe.missing': 'The channel link is not configured yet',
+
+      // ---------- About screen ----------
+      'about.open': 'About the project',
+      'about.title': 'About the project',
+      'about.channelText': 'The beta, new buildings and everything we fix along the way show up in the channel first.',
+      'about.what': 'What this is',
+      'about.whatText': 'TIU GO shows whether the lifts are free while you are still walking to the building. How many people are in the cabin, which floor it is on and how long the wait is — all before you join the queue.',
+      'about.facts': 'The building in short',
+      'about.floors': 'Floors',
+      'about.lifts': 'Lifts',
+      'about.working': 'In service',
+      'about.workingValue': '{working} of {total}',
+      'about.camera': 'Cameras on floor',
+      'about.refresh': 'Refresh',
+      'about.refreshValue': 'every {seconds} s',
+      'about.data': 'Where the data comes from',
+      'about.dataText': 'For now the app runs on test data: cameras in the cabins will be connected later. Waiting time is computed with the same formulas as in the project models — only the inputs change.',
 
       // ---------- Вибрация ----------
       'notif.haptics': 'Vibrate on events',
@@ -620,6 +654,23 @@
       'subscribe.text': '订阅频道，第一时间获知测试版和更新',
       'subscribe.button': '打开频道',
       'subscribe.missing': '频道链接尚未配置',
+
+      // ---------- 关于项目 ----------
+      'about.open': '关于项目',
+      'about.title': '关于项目',
+      'about.channelText': '测试版、新楼栋以及我们一路修复的内容，都会先发布在频道里。',
+      'about.what': '这是什么',
+      'about.whatText': 'TIU GO 让你在走向楼栋的路上就知道电梯是否空闲：轿厢里有多少人、停在哪一层、还要等多久，排队之前就能看到。',
+      'about.facts': '楼栋概况',
+      'about.floors': '楼层',
+      'about.lifts': '电梯',
+      'about.working': '运行中',
+      'about.workingValue': '{total} 部中的 {working} 部',
+      'about.camera': '摄像头楼层',
+      'about.refresh': '刷新',
+      'about.refreshValue': '每 {seconds} 秒',
+      'about.data': '数据来源',
+      'about.dataText': '目前应用使用测试数据，轿厢摄像头稍后接入。等待时间使用与项目模型相同的公式计算，只是输入数据不同。',
 
       // ---------- Вибрация ----------
       'notif.haptics': '事件震动提示',

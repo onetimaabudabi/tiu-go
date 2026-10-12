@@ -13,6 +13,7 @@ import { Crowd } from '../scene/crowd.js';
 import { Simulator } from './simulator.js';
 import { createControls } from '../ui/controls.js';
 import { createStats } from '../ui/stats.js';
+import { createCameraUi } from '../ui/camera-ui.js';
 import { Quality } from './quality.js';
 import { SIM } from './params.js';
 
@@ -64,6 +65,10 @@ export async function boot(app) {
 
   const stats = createStats(app, sim);
   const controls = createControls(app, sim);
+
+  // Оверлей режима наблюдения: рамки детекции, табло, мини-карта.
+  // Создаётся после толпы и симулятора — он берёт данные у них.
+  app.setOverlay(createCameraUi(app, sim));
 
   app.setDriver(new Driver(sim, stats));
   app.sim = sim;

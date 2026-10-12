@@ -1940,6 +1940,101 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 
 .promo .button { margin-top: 4px; }
 
+/*
+ * Большая карточка приглашения на экране «О проекте». Та же подложка,
+ * что у карточки в настройках, но с иконкой-значком и крупным
+ * заголовком: здесь приглашение — главное на экране, а не строка в
+ * списке настроек.
+ */
+.promo--large {
+  gap: 10px;
+  padding: 20px 18px;
+  text-align: center;
+  align-items: center;
+}
+
+.promo--large .promo__title { font-size: 19px; }
+.promo--large .promo__text { max-width: 30ch; }
+.promo--large .button { width: 100%; }
+
+.promo__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  /* Иконка приезжает чуть позже карточки — экран открывается мягче */
+  animation: promo-badge 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.promo__badge .icon { width: 24px; height: 24px; }
+
+@keyframes promo-badge {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo__badge { animation: none; }
+}
+
+/* ══ Экран «О проекте» ═══════════════════════════════════ */
+
+.about__card { display: flex; flex-direction: column; gap: 10px; }
+
+.about__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  letter-spacing: -0.2px;
+}
+
+.about__head .icon { color: var(--label-3); }
+
+.about__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+/* Факты о корпусе: подпись слева, значение справа */
+.about__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 12px;
+  margin: 0;
+}
+
+.about__facts dt {
+  font-size: 14px;
+  color: var(--label-2);
+  min-width: 0;
+}
+
+.about__facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Строка «О проекте» в настройках — кнопка, а не ссылка */
+button.linkrow {
+  width: 100%;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* ══ Планировщик выхода ══════════════════════════════════ */
 
 .plan__intro {

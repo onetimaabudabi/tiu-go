@@ -23,6 +23,7 @@ import { Lighting } from './scene/lighting.js';
 import { Building } from './scene/building.js';
 import { Hall } from './scene/hall.js';
 import { Elevator, easeInOutCubic } from './scene/elevator.js';
+import { CameraViewController } from './scene/camera-view.js';
 
 // ======================= Рендерер и сцена =======================
 
@@ -112,6 +113,17 @@ const VIEWS = {
     target: new THREE.Vector3(-0.6, 0, -0.4),
     // Сверху смотрим только на холл: перекрытия выше срезаются
     cutaway: 1
+  },
+  camera: {
+    // Вид с камеры наблюдения: позу, угол обзора и кадр 16:9 ведёт
+    // scene/camera-view.js — там же числа технической модели.
+    label: '📹 С камеры 1 этажа',
+    cctv: 'CAM-01'
+  },
+  free: {
+    // Камера остаётся где есть и отдаётся зрителю
+    label: '🕹 Свободный полёт',
+    free: true
   }
 };
 
@@ -142,7 +154,31 @@ function setView(key) {
   const view = VIEWS[key];
   if (!view) return;
 
+  // Вид с камеры наблюдения живёт по своим правилам: своя поза, свой
+  // угол обзора, свой кадр и выключенная орбита.
+  if (view.cctv) {
+    cameraView.enter(view.cctv);
+    return;
+  }
+
+  // Выходим без обратного перелёта: вид, который выбрали, задаст его сам
+  if (cameraView.active) cameraView.exit({ fly: false });
+
   followLift = null;
+
+  // Свободный полёт: камера не переезжает, просто отдаётся зрителю
+  if (view.free) {
+    cameraTween.active = false;
+    building.showAllFloors();
+    for (const lift of elevators) {
+      lift.setXray(false);
+      lift.setTopView(false);
+    }
+    if (app.crowd) app.crowd.setCeiling(Infinity);
+    controls.enabled = true;
+    return;
+  }
+
   const plan = Boolean(view.cutaway);
   for (const lift of elevators) {
     lift.setXray(false);
@@ -159,6 +195,8 @@ function setView(key) {
 
 /** Камера едет вдоль шахты вместе с кабиной. */
 function setFollow(number) {
+  if (cameraView.active) cameraView.exit({ fly: false });
+
   followLift = number;
   building.showAllFloors();
 
@@ -206,6 +244,15 @@ function followPosition(number, out) {
 }
 
 function updateCamera(dt) {
+  // Камера наблюдения ведёт себя сама: поза, покачивание подвеса,
+  // прямоугольник кадра. Орбита в этом режиме выключена.
+  if (cameraView.active) {
+    cameraView.update(dt);
+    hall.setCeilingVisible(cameraView.probeHeight < HALL.height + 0.2);
+    building.setRoofVisible(true);
+    return;
+  }
+
   if (cameraTween.active) {
     cameraTween.t += dt / cameraTween.duration;
     const k = easeInOutCubic(Math.min(1, cameraTween.t));
@@ -254,6 +301,9 @@ let quality = null;
 /** Хук симуляции: ставится в stage 4, до этого сцена просто живёт. */
 let driver = null;
 
+/** Оверлей режима камеры: ставится из logic/bootstrap.js. */
+let overlay = null;
+
 function step(dtSim) {
   for (const lift of elevators) lift.beginStep();
   if (driver && driver.beginStep) driver.beginStep();
@@ -298,7 +348,12 @@ function frame(now) {
   updateCamera(realDt);
   measureFps(now);
 
-  renderer.render(scene, camera);
+  if (cameraView.active) cameraView.renderFrame(renderer, scene);
+  else renderer.render(scene, camera);
+
+  // Рамки детекции и табло рисуются после рендера: проекция считается
+  // по тем матрицам, которые рендерер только что обновил.
+  if (overlay) overlay.frame(realDt);
 }
 
 /**
@@ -360,6 +415,9 @@ export const app = {
     fps.since = performance.now();
   },
 
+  /** Оверлей рамок детекции и табло (ui/camera-ui.js). */
+  setOverlay(value) { overlay = value; },
+
   play() { running = true; },
   pause() { running = false; },
   toggle() { running = !running; return running; },
@@ -370,6 +428,10 @@ export const app = {
   get followLift() { return followLift; },
   views: VIEWS
 };
+
+// Режим наблюдения создаётся после app: контроллер держит на него ссылку
+const cameraView = new CameraViewController(app);
+app.cameraView = cameraView;
 
 window.tiu = app;           // чтобы можно было покрутить из консоли
 

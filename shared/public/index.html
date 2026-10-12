@@ -670,6 +670,98 @@
   <!-- Общая подложка для нижних модалок -->
   <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
 
+  <!-- ══ Экран «О проекте» ══════════════════════════════ -->
+  <!--
+    Третий экран приложения. Нужен не ради текста о проекте, а ради
+    приглашения подписаться: в шапке для этого есть только иконка, в
+    настройках — карточка, а здесь приглашение занимает целый экран и
+    объясняет, на что именно человек подписывается.
+
+    Цифры в блоке «коротко о корпусе» не прописаны руками: их ставит
+    app.js из того же ответа /api/status, по которому живёт главный
+    экран. Поменяется корпус — поменяется и этот экран.
+  -->
+  <section class="screen" id="screen-about" hidden>
+
+    <header class="navbar glass">
+      <div class="navbar__titles" id="about-home" role="button" tabindex="0"
+           data-i18n-aria="a11y.home">
+        <span class="navbar__title" data-i18n="about.title">О проекте</span>
+        <span class="navbar__subtitle" id="about-address">—</span>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- Приглашение подписаться: карточка появляется, если ссылка задана -->
+      <section class="promo promo--large" id="about-channel" hidden>
+        <span class="promo__badge" aria-hidden="true">
+          <svg class="icon" aria-hidden="true"><use href="#icon-telegram"></use></svg>
+        </span>
+        <b class="promo__title" data-i18n="subscribe.title">Новости TIU GO</b>
+        <span class="promo__text" data-i18n="about.channelText">
+          Бета-версия, новые корпуса и всё, что мы чиним по дороге, —
+          сначала в канале, потом везде.
+        </span>
+        <button class="button button--accent" id="about-channel-button" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-telegram"></use></svg>
+          <span data-i18n="subscribe.button">Открыть канал</span>
+        </button>
+      </section>
+
+      <!-- Что это такое -->
+      <section class="card about__card">
+        <span class="about__head">
+          <svg class="icon" aria-hidden="true"><use href="#icon-info"></use></svg>
+          <b data-i18n="about.what">Что это</b>
+        </span>
+        <p class="about__text" data-i18n="about.whatText">
+          TIU GO показывает, свободны ли лифты, пока ты ещё идёшь к корпусу.
+          Сколько человек в кабине, на каком она этаже и сколько ждать —
+          видно до того, как встанешь в очередь.
+        </p>
+      </section>
+
+      <!-- Коротко о корпусе: цифры ставит app.js из /api/status -->
+      <section class="card about__card">
+        <span class="about__head">
+          <svg class="icon" aria-hidden="true"><use href="#icon-elevator"></use></svg>
+          <b data-i18n="about.facts">Коротко о корпусе</b>
+        </span>
+        <dl class="about__facts">
+          <dt data-i18n="about.floors">Этажей</dt>
+          <dd id="about-floors">—</dd>
+
+          <dt data-i18n="about.lifts">Лифтов</dt>
+          <dd id="about-lifts">—</dd>
+
+          <dt data-i18n="about.working">Работают</dt>
+          <dd id="about-working">—</dd>
+
+          <dt data-i18n="about.camera">Камеры на этаже</dt>
+          <dd id="about-camera">—</dd>
+
+          <dt data-i18n="about.refresh">Обновление</dt>
+          <dd id="about-refresh">—</dd>
+        </dl>
+      </section>
+
+      <!-- Откуда берутся числа -->
+      <section class="card about__card">
+        <span class="about__head">
+          <svg class="icon" aria-hidden="true"><use href="#icon-camera"></use></svg>
+          <b data-i18n="about.data">Откуда данные</b>
+        </span>
+        <p class="about__text" data-i18n="about.dataText">
+          Сейчас приложение работает на тестовых данных: камеры в кабинах
+          подключим позже. Ожидание считается по тем же формулам, что и в
+          моделях проекта, — меняются только исходные числа.
+        </p>
+      </section>
+
+    </div>
+  </section>
+
   <!-- ══ Модалка «сообщить о проблеме» ══════════════════ -->
   <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
        aria-labelledby="sheet-title">
@@ -751,6 +843,15 @@
         </span>
         <svg class="icon linkrow__go" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
       </a>
+
+      <!-- О проекте: отдельный экран с приглашением подписаться -->
+      <button class="linkrow" id="about-link" type="button">
+        <span class="linkrow__text">
+          <svg class="icon" aria-hidden="true"><use href="#icon-info"></use></svg>
+          <span data-i18n="about.open">О проекте</span>
+        </span>
+        <svg class="icon linkrow__go" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+      </button>
 
       <!-- Канал проекта: карточка появляется, если ссылка задана в .env -->
       <div class="promo" id="channel-promo" hidden>

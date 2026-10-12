@@ -163,6 +163,14 @@ export function createControls(app, sim) {
 
   markActive([...viewButtons, ...followButtons], viewButtons[0]);
 
+  // Переключение вида из другого модуля — чтобы подсветка кнопок
+  // не разъезжалась с тем, что на экране (кнопка выхода из режима
+  // камеры в ui/camera-ui.js).
+  window.__tiuSetView = (key) => {
+    const index = viewKeys.indexOf(key);
+    if (index >= 0) viewButtons[index].click();
+  };
+
   // Камеру перехватили мышью — снимаем подсветку с кнопок
   window.__tiuOnCameraGrab = () => markActive([...viewButtons, ...followButtons], null);
   // Окно сравнения останавливает день и возвращает его обратно —
@@ -250,6 +258,22 @@ export function createControls(app, sim) {
     if (event.code === 'KeyR') btnReset.click();
     if (event.code === 'KeyS') btnSystem.click();
     if (event.code === 'KeyC') btnCompare.click();
+
+    // Цифры 1…5 — виды камеры в том порядке, в каком они перечислены
+    // в app.views: холл, разрез, сверху, с камеры 1 этажа, свободно.
+    const digit = /^Digit([1-9])$/.exec(event.code);
+    if (digit) {
+      const index = Number(digit[1]) - 1;
+      if (index < viewButtons.length) viewButtons[index].click();
+    }
+
+    // Мульти-камера и выход — только когда режим наблюдения включён
+    if (event.code === 'KeyM' && app.cameraView.active) {
+      const box = document.getElementById('cam-opt-multi');
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change'));
+    }
+    if (event.code === 'Escape' && app.cameraView.active) viewButtons[0].click();
   });
 
   refreshPlay();
