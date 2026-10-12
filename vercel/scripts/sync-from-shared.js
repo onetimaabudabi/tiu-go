@@ -23,6 +23,14 @@ const SHARED = path.join(ROOT, 'shared');
 
 let failed = 0;
 
+// На Vercel корнем проекта указана папка vercel/, и shared/ в деплой
+// не попадает — синхронизировать там не из чего и не нужно: копии
+// лежат в репозитории. Поэтому это не ошибка сборки, а штатный случай.
+if (!fs.existsSync(SHARED)) {
+  console.log('Папки shared/ рядом нет — работаем с копиями, которые уже в vercel/.');
+  process.exit(0);
+}
+
 /** Заменяет кусок текста и ругается, если куска не нашлось. */
 function patch(source, from, to, label) {
   if (source.indexOf(from) === -1) {

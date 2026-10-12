@@ -28,3 +28,9 @@ shared/data/history.json
 vercel/node_modules/
 vercel/.vercel/
 vercel/.env
+
+# Ролики и промежуточные файлы сборки видео — тяжёлые, пересобираются скриптом
+videos/*/renders/
+videos/*/snapshots/
+videos/*/node_modules/
+videos/*/.vercel/

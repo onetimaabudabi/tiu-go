@@ -14,10 +14,7 @@ process.env.ADMIN_ENABLED = 'true';
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const express = require('express');
-const handler = require('../api/_handler');
-const cron = require('../api/cron/notify');
-const tgHook = require('../api/telegram-webhook');
-const maxHook = require('../api/max-webhook');
+const handler = require('../api/[...path].js');
 const storage = require('../lib/storage');
 
 const PORT = 3123;
@@ -45,10 +42,8 @@ async function call(method, url, body) {
   return { status: res.status, json, text };
 }
 
+// Стенд повторяет Vercel после rewrite: любой /api/* идёт в одну функцию
 const app = express();
-app.all('/api/cron/notify', (req, res) => cron(req, res));
-app.all('/api/telegram-webhook', express.json(), (req, res) => tgHook(req, res));
-app.all('/api/max-webhook', express.json(), (req, res) => maxHook(req, res));
 app.all('/api/*', (req, res) => handler(req, res));
 
 const server = app.listen(PORT, run);
@@ -174,6 +169,28 @@ async function run() {
     message: { sender: { user_id: 7 }, recipient: { chat_id: 7 }, body: { text: '/start' } }
   });
   check('MAX: обновление принято', maxPost.status === 200 && maxPost.json.ok === true, maxPost.json);
+
+  // ---------- 11. Функция действительно одна ----------
+  //
+  // Ради этого всё и затевалось: на бесплатном тарифе Vercel больше
+  // двенадцати функций на деплой не берёт.
+  console.log('\nСлияние функций');
+
+  const fs = require('fs');
+  const path = require('path');
+  const apiDir = path.resolve(__dirname, '..', 'api');
+
+  function countFunctions(dir) {
+    return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, item) => {
+      if (item.isDirectory()) return sum + countFunctions(path.join(dir, item.name));
+      // Vercel не считает функциями файлы, чьё имя начинается с подчёркивания
+      return sum + (item.name.endsWith('.js') && !item.name.startsWith('_') ? 1 : 0);
+    }, 0);
+  }
+
+  const functions = countFunctions(apiDir);
+  check('в api/ ровно одна функция', functions === 1, functions);
+  check('лимит бесплатного тарифа (12) соблюдён', functions <= 12, functions);
 
   console.log('\nИтог: ' + passed + ' проверок прошло, ' + failed + ' упало');
   server.close();
