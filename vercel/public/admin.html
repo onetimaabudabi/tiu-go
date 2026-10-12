@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>TIU GO — админка лифтов</title>
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <!-- Спрайт иконок подгружает admin.js из icons.svg -->
+
+  <header class="head">
+    <div>
+      <h1 class="head__title">Админка лифтов</h1>
+      <p class="head__sub" id="head-sub">Корпус 7, Мельникайте 70 · тестовые данные</p>
+    </div>
+
+    <div class="head__actions">
+      <button class="btn" id="btn-reset" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+        Сбросить к случайным
+      </button>
+      <button class="btn" id="btn-all-working" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+        Все работают
+      </button>
+      <button class="btn" id="btn-test-push" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg>
+        Тестовое уведомление
+      </button>
+    </div>
+  </header>
+
+  <p class="hint">
+    Значения, выставленные вручную, замирают — симуляция перестаёт их менять.
+    Вернуть лифт в движение можно кнопкой «Сбросить к случайным».
+    Всё хранится в памяти сервера: после перезапуска данные снова станут случайными.
+  </p>
+
+  <main class="list" id="list"><!-- карточки строит admin.js --></main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="icons.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

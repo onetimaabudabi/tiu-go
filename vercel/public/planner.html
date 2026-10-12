@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" id="theme-color" content="#0B0D12" />
+
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+  <title>TIU GO — планировщик выхода</title>
+
+  <!-- Тема до первой отрисовки: иначе при светлой теме мелькнёт тёмный фон -->
+  <script>
+    (function () {
+      var theme = 'dark';
+      try {
+        var saved = window.localStorage.getItem('tiu-go-theme');
+        if (saved === 'light' || saved === 'dark') {
+          theme = saved;
+        } else if (window.matchMedia &&
+                   window.matchMedia('(prefers-color-scheme: light)').matches) {
+          theme = 'light';
+        }
+      } catch (e) { /* localStorage недоступен — остаёмся на тёмной */ }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!--
+    Спрайт иконок подгружается из того же icons.svg, что и на главном
+    экране. На главном он вставлен инлайном ради первой отрисовки,
+    здесь торопиться некуда — одна иконка погоды не делает.
+  -->
+  <div id="icon-sprite" aria-hidden="true" style="display:none"></div>
+
+  <section class="screen" id="screen-planner">
+    <header class="navbar glass">
+      <div class="navbar__titles">
+        <span class="navbar__title" data-i18n="plan.title">Планировщик выхода</span>
+        <span class="navbar__subtitle" id="plan-address">—</span>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <p class="plan__intro" data-i18n="plan.subtitle">
+        Посчитаем, когда выходить, чтобы успеть вовремя
+      </p>
+
+      <section class="card">
+        <label class="field">
+          <span class="field__label" data-i18n="plan.from">Сейчас на этаже</span>
+          <select class="field__input" id="plan-from"></select>
+        </label>
+
+        <label class="field">
+          <span class="field__label" data-i18n="plan.to">Нужно попасть на этаж</span>
+          <select class="field__input" id="plan-to"></select>
+        </label>
+
+        <label class="field">
+          <span class="field__label" data-i18n="plan.time">К какому времени</span>
+          <input class="field__input" type="time" id="plan-time" value="09:45" />
+        </label>
+
+        <label class="field">
+          <span class="field__label" data-i18n="plan.day">День недели</span>
+          <select class="field__input" id="plan-day"></select>
+        </label>
+
+        <button class="button button--accent button--wide" id="plan-calc" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-route"></use></svg>
+          <span data-i18n="plan.calc">Рассчитать</span>
+        </button>
+      </section>
+
+      <!-- Результат появляется после расчёта -->
+      <section class="card plan__result" id="plan-result" hidden data-status="ok">
+        <span class="plan__status" id="plan-status">—</span>
+        <b class="plan__exit" id="plan-exit">—</b>
+        <p class="plan__explain" id="plan-explain">—</p>
+        <p class="plan__source" id="plan-source">—</p>
+
+        <button class="button button--outline button--wide" id="plan-calendar" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+          <span data-i18n="plan.calendar">Добавить в календарь</span>
+        </button>
+      </section>
+
+      <a class="button button--ghost button--wide" href="index.html" id="plan-back">
+        <svg class="icon" aria-hidden="true"><use href="#icon-back"></use></svg>
+        <span data-i18n="plan.back">К лифтам</span>
+      </a>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="icons.js"></script>
+  <script src="i18n.js"></script>
+  <script src="planner.js"></script>
+</body>
+</html>

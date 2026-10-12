@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>TIU GO — промо</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /*
+        Палитра взята из самого приложения (shared/public/style.css):
+        фон, заливка карточек, акцент и цвета статусов — те же значения,
+        чтобы ролик и продукт выглядели одним целым.
+      */
+      :root {
+        --bg: #0b0f14;
+        --card: rgba(255, 255, 255, 0.07);
+        --line: rgba(255, 255, 255, 0.12);
+        --fg: #f3f6f9;
+        --label-2: #9ca3af;
+        --accent: #5b8def;
+        --free: #4ad991;
+        --busy: #ffd166;
+        --full: #ff7a73;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* Мягкое свечение в углу — чтобы фон не был плоским чёрным */
+      .glow {
+        position: absolute;
+        width: 1200px;
+        height: 1200px;
+        border-radius: 50%;
+        filter: blur(160px);
+        opacity: 0.22;
+      }
+
+      .glow--left { left: -420px; top: -360px; background: var(--accent); }
+      .glow--right { right: -460px; bottom: -520px; background: #7c5bef; }
+
+      /* ---------- Телефон ---------- */
+
+      .phone {
+        position: absolute;
+        top: 50%;
+        right: 190px;
+        width: 448px;
+        height: 970px;
+        margin-top: -485px;
+        border-radius: 52px;
+        border: 2px solid var(--line);
+        background: #000;
+        overflow: hidden;
+        box-shadow: 0 60px 120px rgba(0, 0, 0, 0.6);
+      }
+
+      .phone img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* ---------- Текстовая колонка ---------- */
+
+      .copy {
+        position: absolute;
+        left: 150px;
+        top: 50%;
+        width: 900px;
+        margin-top: -220px;
+      }
+
+      .kicker {
+        margin: 0 0 18px;
+        font-size: 26px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--label-2);
+      }
+
+      .head {
+        margin: 0;
+        font-size: 104px;
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        font-weight: 700;
+      }
+
+      .head em { font-style: normal; color: var(--busy); }
+      .head b { font-weight: 700; color: var(--free); }
+
+      .sub {
+        margin: 26px 0 0;
+        font-size: 34px;
+        line-height: 1.35;
+        color: var(--label-2);
+      }
+
+      /* ---------- Карточка ожидания ---------- */
+
+      .wait {
+        position: absolute;
+        left: 150px;
+        top: 50%;
+        width: 860px;
+        margin-top: -230px;
+        padding: 54px 60px 60px;
+        border-radius: 40px;
+        background: var(--card);
+        border: 1px solid var(--line);
+      }
+
+      .wait__label {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 30px;
+        color: var(--label-2);
+      }
+
+      .wait__dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--busy);
+      }
+
+      .wait__value {
+        margin-top: 16px;
+        font-size: 180px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .wait__unit { font-size: 64px; color: var(--label-2); margin-left: 18px; }
+
+      .wait__lift { margin-top: 26px; font-size: 32px; color: var(--label-2); }
+
+      /* ---------- Финальная плашка ---------- */
+
+      .final {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .final__mark {
+        font-size: 150px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+
+      .final__place { font-size: 36px; color: var(--label-2); }
+
+      .final__claim {
+        margin-top: 34px;
+        padding: 18px 44px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 38px;
+        font-weight: 650;
+      }
+
+      /* Зелёная вспышка на моменте «свободен» */
+      .flash {
+        position: absolute;
+        inset: 0;
+        background: var(--free);
+        opacity: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div data-hf-id="hf-gxr6" id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="8">
+      <!-- Фон живёт весь ролик: свечение не моргает на склейках -->
+      <section data-hf-id="hf-p715" id="bg" class="clip" data-start="0" data-duration="8">
+        <i data-hf-id="hf-2snu" class="glow glow--left" data-layout-allow-overflow=""></i>
+        <i data-hf-id="hf-tpu3" class="glow glow--right" data-layout-allow-overflow=""></i>
+      </section>
+
+      <!-- ── 1. Проблема: три лифта из шести, минута в очереди ── -->
+      <section data-hf-id="hf-rcd7" id="s1" class="clip" data-start="0" data-duration="2.1">
+        <div data-hf-id="hf-5h0d" class="copy" id="s1-copy">
+          <p data-hf-id="hf-wjs5" class="kicker">Корпус 7 · Мельникайте 70</p>
+          <h1 data-hf-id="hf-kxke" class="head">Работают<br data-hf-id="hf-x5px"><em data-hf-id="hf-63xz">3 из 6</em> лифтов</h1>
+          <p data-hf-id="hf-2e0o" class="sub">Через 5 минут очередь вырастет до 13 человек</p>
+        </div>
+        <div data-hf-id="hf-njsl" class="phone" id="s1-phone">
+          <img data-hf-id="hf-cmd7" src="assets/media/app-busy-main.png" alt="">
+        </div>
+      </section>
+
+      <!-- ── 2. Приложение ── -->
+      <section data-hf-id="hf-lby4" id="s2" class="clip" data-start="2.1" data-duration="1.5">
+        <div data-hf-id="hf-mjlk" class="copy" id="s2-copy">
+          <p data-hf-id="hf-21hc" class="kicker">Телеграм и MAX</p>
+          <h1 data-hf-id="hf-yhmn" class="head">Открой<br data-hf-id="hf-rsrt">TIU GO</h1>
+          <p data-hf-id="hf-mylp" class="sub">Шесть лифтов на одном экране</p>
+        </div>
+        <div data-hf-id="hf-r5ea" class="phone" id="s2-phone">
+          <img data-hf-id="hf-fpos" src="assets/media/app-free-main.png" alt="">
+        </div>
+      </section>
+
+      <!-- ── 3. Счётчик: настоящие показания приложения ── -->
+      <section data-hf-id="hf-lnct" id="s3" class="clip" data-start="3.6" data-duration="2.0">
+        <div data-hf-id="hf-6cmq" class="wait" id="s3-card">
+          <div data-hf-id="hf-ctsm" class="wait__label"><i data-hf-id="hf-7mt0" class="wait__dot" id="s3-dot"></i> Ожидание лифта</div>
+          <div data-hf-id="hf-2x0c" class="wait__value"><span data-hf-id="hf-w7ec" id="s3-num">81</span><span data-hf-id="hf-r1wm" class="wait__unit">сек</span></div>
+          <div class="wait__lift">
+            <span id="s3-lift-busy">Лифт 6 · в кабине 9 из 10</span>
+            <span id="s3-lift-free" style="position: absolute">Лифт 1 · кабина пустая, 0 из 10</span>
+          </div>
+        </div>
+        <div data-hf-id="hf-pvsb" class="phone" id="s3-phone">
+          <img data-hf-id="hf-fdzj" src="assets/media/app-busy-detail.png" alt="">
+          <img
+            id="s3-phone-free"
+            src="assets/media/app-free-detail.png"
+            alt=""
+            style="position: absolute; inset: 0"
+          />
+        </div>
+      </section>
+
+      <!-- ── 4. Свободен ── -->
+      <section data-hf-id="hf-355z" id="s4" class="clip" data-start="5.6" data-duration="0.7">
+        <div data-hf-id="hf-0sqr" class="wait" id="s4-card" style="left: 50%; width: 1020px; margin-left: -510px">
+          <div data-hf-id="hf-78vu" class="wait__label"><i data-hf-id="hf-4vhu" class="wait__dot" style="background: var(--free)"></i> Ожидание лифта</div>
+          <div data-hf-id="hf-y848" class="wait__value" style="color: var(--free)">3–5<span data-hf-id="hf-0nai" class="wait__unit">сек</span></div>
+          <div data-hf-id="hf-ilb7" class="wait__lift">Лифт 1 · кабина пустая, 0 из 10</div>
+        </div>
+        <i data-hf-id="hf-xcrg" class="flash" id="s4-flash"></i>
+      </section>
+
+      <!-- ── 5. Логотип ── -->
+      <section data-hf-id="hf-v71r" id="s5" class="clip" data-start="6.3" data-duration="1.7">
+        <div data-hf-id="hf-0n3c" class="final">
+          <div data-hf-id="hf-gjqv" class="final__mark" id="s5-mark">TIU GO</div>
+          <div data-hf-id="hf-nl9s" class="final__place" id="s5-place">Корпус 7 · Мельникайте 70</div>
+          <div data-hf-id="hf-aju2" class="final__claim" id="s5-claim">Время — твоё</div>
+        </div>
+      </section>
+
+      <!-- ── Звук ── -->
+      <audio data-hf-id="hf-7ap4" id="vo1" src="assets/voice/seg1.m4a" data-start="0.1" data-volume="1"></audio>
+      <audio data-hf-id="hf-jnh7" id="vo2" src="assets/voice/seg2.m4a" data-start="2.15" data-volume="1"></audio>
+      <audio data-hf-id="hf-5flh" id="vo3" src="assets/voice/seg3.m4a" data-start="6.35" data-volume="1"></audio>
+      <audio data-hf-id="hf-uvue" id="bgm" src="assets/music/drive.mp3" data-start="0" data-duration="8" data-media-start="6" data-volume="0.28"></audio>
+      <audio data-hf-id="hf-wjcu" id="hit" src="assets/sfx/impactSoft_heavy_002.ogg" data-start="5.6" data-volume="0.7"></audio>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // ---- 1. Проблема ----
+      tl.fromTo("#s1-copy", { y: 44, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 0.1);
+      tl.fromTo("#s1-phone", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" }, 0.05);
+      tl.to("#s1-phone", { y: -40, duration: 1.3, ease: "none" }, 0.8);
+      tl.to(["#s1-copy", "#s1-phone"], { opacity: 0, duration: 0.25, ease: "power2.in" }, 1.85);
+
+      // ---- 2. Приложение ----
+      tl.fromTo("#s2-copy", { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 2.15);
+      tl.fromTo("#s2-phone", { x: 160, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 2.1);
+      tl.to(["#s2-copy", "#s2-phone"], { opacity: 0, duration: 0.2, ease: "power2.in" }, 3.4);
+
+      // ---- 3. Счётчик: 76 секунд → 5 ----
+      // Оба значения сняты с работающего приложения: «~45 сек – 1 мин 16 сек»
+      // у шестого лифта и «~3–5 сек» у свободного первого.
+      const counter = { v: 81 };
+      tl.fromTo("#s3-card", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "power3.out" }, 3.6);
+      tl.fromTo("#s3-phone", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 3.6);
+      tl.to(
+        counter,
+        {
+          v: 5,
+          duration: 1.3,
+          ease: "power2.inOut",
+          onUpdate() {
+            const node = document.getElementById("s3-num");
+            if (node) node.textContent = String(Math.round(counter.v));
+          }
+        },
+        4.1
+      );
+      // Карточка на телефоне меняется вместе с числом: шестой лифт — долго,
+      // первый — сразу. Ради этого выбора приложение и существует.
+      tl.fromTo("#s3-phone-free", { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.inOut" }, 4.75);
+      tl.fromTo("#s3-lift-free", { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.inOut" }, 4.75);
+      tl.to("#s3-lift-busy", { opacity: 0, duration: 0.3, ease: "power2.inOut" }, 4.75);
+      tl.to("#s3-num", { color: "#4ad991", duration: 0.4, ease: "none" }, 4.9);
+      tl.to("#s3-dot", { backgroundColor: "#4ad991", duration: 0.4, ease: "none" }, 4.9);
+      tl.to(["#s3-card", "#s3-phone"], { opacity: 0, duration: 0.18, ease: "power2.in" }, 5.5);
+
+      // ---- 4. Свободен ----
+      tl.fromTo("#s4-flash", { opacity: 0.55 }, { opacity: 0, duration: 0.5, ease: "power2.out" }, 5.6);
+      tl.fromTo("#s4-card", { scale: 1.06 }, { scale: 1, duration: 0.45, ease: "power3.out" }, 5.6);
+      tl.to("#s4-card", { opacity: 0, duration: 0.2, ease: "power2.in" }, 6.15);
+
+      // ---- 5. Логотип ----
+      tl.fromTo("#s5-mark", { y: 36, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 6.35);
+      tl.fromTo("#s5-place", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 6.5);
+      tl.fromTo("#s5-claim", { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "back.out(1.8)" }, 6.75);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

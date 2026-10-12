@@ -1,0 +1,218 @@
+/* ==========================================================================
+   TIU GO — админка лифтов.
+   Отдельная страница и отдельные стили: это служебный инструмент,
+   он не обязан следовать темам и локализации мини-приложения.
+   Тёмная тема одна, шрифт — Inter, если он есть в системе.
+   ========================================================================== */
+
+:root {
+  --bg: #0B0D12;
+  --card: #161A22;
+  --line: #232833;
+  --label: #FFFFFF;
+  --label-2: #9CA3AF;
+  --label-3: #6B7280;
+
+  --accent: #5B8DEF;
+  --ok: #22C55E;
+  --busy: #F59E0B;
+  --full: #EF4444;
+
+  --r: 14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  padding: 24px 20px 56px;
+  background: var(--bg);
+  color: var(--label);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui,
+               'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+
+/* Иконки спрайта — те же правила, что и в мини-приложении */
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.15em;
+  flex: 0 0 auto;
+}
+
+/* ── Шапка ──────────────────────────────────────────────── */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto 14px;
+}
+
+.head__title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+.head__sub { margin-top: 4px; font-size: 13px; color: var(--label-2); }
+
+.head__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.hint {
+  max-width: 980px;
+  margin: 0 auto 22px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--label-3);
+}
+
+/* ── Кнопки ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.15s;
+}
+
+.btn:hover { border-color: var(--label-3); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.btn--accent {
+  border-color: transparent;
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* ── Список лифтов ──────────────────────────────────────── */
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.lift {
+  --status: var(--label-3);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--status);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.lift[data-status='working']     { --status: var(--ok); }
+.lift[data-status='broken']      { --status: var(--full); }
+.lift[data-status='maintenance'] { --status: var(--busy); }
+
+.lift__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lift__name { font-size: 16px; font-weight: 600; }
+.lift__meta { font-size: 12px; color: var(--label-3); }
+
+.lift__frozen {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--busy);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Переключатель статуса ──────────────────────────────── */
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.seg__btn {
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.seg__btn.is-on { background: var(--card); color: var(--label); font-weight: 600; }
+.seg__btn[data-value='working'].is-on     { color: var(--ok); }
+.seg__btn[data-value='broken'].is-on      { color: var(--full); }
+.seg__btn[data-value='maintenance'].is-on { color: var(--busy); }
+
+/* ── Поля ───────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+
+.field__label { font-size: 11.5px; letter-spacing: 0.2px; color: var(--label-3); }
+
+.input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus { border-color: var(--accent); }
+
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+/* ── Тост ───────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.toast[data-tone='error'] { border-color: var(--full); color: var(--full); }
+.toast[data-tone='ok'] { border-color: var(--ok); }
+
+@media (max-width: 520px) {
+  body { padding: 18px 14px 48px; }
+  .nums { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,94 @@
+{
+  "_comment": "Единый источник параметров корпуса 7. Правится только здесь: tech-model/params.js, math-model/params.js, shared/data/mockData.js и 3d-sim/ читают эти числа и не держат своих. Проверка согласованности — npm run check:params.",
+
+  "building": {
+    "name": "Корпус 7, Мельникайте 70",
+    "floors": 16,
+    "floorHeight": 3,
+    "cafeteriaFloor": 5
+  },
+
+  "elevators": {
+    "total": 6,
+    "working": [1, 2, 6],
+    "broken": [3, 4, 5],
+    "banks": {
+      "_comment": "Две группы по три шахты друг против друга. Номера идут от входа вглубь холла: 1-2-3 по левую руку, 4-5-6 по правую. Из работающих 1 и 2 — слева, 6 — справа, в глубине.",
+      "left": [1, 2, 3],
+      "right": [4, 5, 6]
+    },
+    "capacityPassport": 5,
+    "capacityRealPeak": 10,
+    "capacityRealNormal": 6,
+    "payloadKg": 1000,
+    "speed": 1.0,
+    "acceleration": 1.0,
+    "doorWidth": 0.9,
+    "doorOpenTime": 2,
+    "doorCloseTime": 2,
+    "doorHoldTime": 3,
+    "boardingTimePerPerson": 2
+  },
+
+  "camera": {
+    "resolution": "1920x1080",
+    "fps": 30,
+    "fovDegrees": 90,
+    "mountingHeight": 2.4,
+    "model": "YOLOv8n",
+    "map50": 0.92,
+    "falsePositiveRate": 0.03,
+    "falseNegativeRate": 0.05,
+    "detectionLatency": 33,
+    "occludedPersonPenalty": 0.15,
+    "darknessPenalty": 0.10,
+    "crowdPenalty": 0.08,
+    "useCorrectedOcclusion": true
+  },
+
+  "people": {
+    "students": 1000,
+    "staff": 150,
+    "avgWeightKg": 70,
+    "avgAreaM2": 0.08,
+    "tripsPerPersonPerDay": 4,
+    "lobbyShare": 0.6,
+    "stairsTimePerFloor": 12,
+    "walkSpeed": 1.35,
+    "walkSpeedSpread": 0.25,
+    "patienceSeconds": 90
+  },
+
+  "schedule": [
+    { "pair": 1, "start": "08:00", "end": "09:45" },
+    { "pair": 2, "start": "09:55", "end": "11:20" },
+    { "pair": 3, "start": "11:30", "end": "13:05" },
+    { "pair": 4, "start": "13:45", "end": "15:20" },
+    { "pair": 5, "start": "15:30", "end": "17:05" },
+    { "pair": 6, "start": "17:15", "end": "18:50" }
+  ],
+
+  "peakIntervals": [
+    { "start": "08:00", "end": "08:15", "weight": 0.08, "label": "Утренний приход" },
+    { "start": "09:45", "end": "10:05", "weight": 0.12, "label": "После 1-й пары" },
+    { "start": "11:20", "end": "11:40", "weight": 0.15, "label": "После 2-й пары" },
+    { "start": "13:05", "end": "13:45", "weight": 0.25, "label": "Обед (макс. пик)" },
+    { "start": "15:20", "end": "15:40", "weight": 0.15, "label": "После 4-й пары" },
+    { "start": "17:05", "end": "17:25", "weight": 0.12, "label": "После 5-й пары" },
+    { "start": "18:50", "end": "19:10", "weight": 0.08, "label": "После 6-й пары" }
+  ],
+
+  "floorDistribution": {
+    "1": 0.05, "2": 0.03, "3": 0.10, "4": 0.10, "5": 0.15,
+    "6": 0.04, "7": 0.04, "8": 0.04, "9": 0.04,
+    "10": 0.08, "11": 0.07, "12": 0.06, "13": 0.05,
+    "14": 0.05, "15": 0.05, "16": 0.05
+  },
+
+  "simulation": {
+    "dayStart": 8,
+    "dayEnd": 20,
+    "runs": 500,
+    "randomSeed": 20261008
+  }
+}

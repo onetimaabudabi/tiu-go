@@ -1,0 +1,2144 @@
+/* ==========================================================================
+   TIU GO — тёмная и светлая темы.
+   Все цвета живут только в переменных: --color-* и --label-*.
+   Тёмная тема — значения по умолчанию в :root,
+   светлая — переопределение в :root[data-theme='light'].
+   ========================================================================== */
+
+:root {
+  /* ── Тёмная тема (по умолчанию) ── */
+  --color-bg: #0B0D12;
+  --color-card: #161A22;
+  --color-line: #232833;
+
+  --label: #FFFFFF;
+  --label-2: #9CA3AF;
+  --label-3: #6B7280;
+
+  --color-accent: #5B8DEF;
+  --color-ok: #22C55E;
+  --color-busy: #F59E0B;
+  --color-full: #EF4444;
+
+  /* Производные от палитры */
+  --color-fill: rgba(255, 255, 255, 0.07);
+  --tint-ok: rgba(34, 197, 94, 0.14);
+  --tint-busy: rgba(245, 158, 11, 0.14);
+  --tint-full: rgba(239, 68, 68, 0.12);
+  --tint-accent: rgba(91, 141, 239, 0.14);
+  --stroke-full: rgba(239, 68, 68, 0.5);
+
+  --shaft-tick: rgba(255, 255, 255, 0.12);
+
+  /* Пустая, но валидная тень: в тёмной теме карточки её не отбрасывают.
+     Писать здесь none нельзя — список вида «inset …, none» браузер
+     отвергает целиком, и вместе с ним пропадают рамки статуса и избранного. */
+  --card-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+
+  /* Янтарная плашка-предупреждение: «работают 4 из 6» и офлайн */
+  --peak-bg: #3A2E15;
+  --peak-fg: #F59E0B;
+
+  /* Избранное */
+  --fav-border: rgba(91, 141, 239, 0.45);
+
+  /* Плашка офлайна и подложка модалки */
+  --offline-bg: #3A2E15;
+  --offline-fg: #F59E0B;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --skeleton: rgba(255, 255, 255, 0.06);
+
+  /* Материал «матовое стекло» для панелей поверх контента */
+  --glass: rgba(11, 13, 18, 0.72);
+  --glass-media: rgba(11, 13, 18, 0.45);
+
+  /* Геометрия */
+  --r-card: 20px;
+  --r-inner: 14px;
+  --r-control: 12px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --theme-shift: 0.3s ease; /* плавная смена темы */
+}
+
+:root[data-theme='light'] {
+  --color-bg: #F7F8FA;
+  --color-card: #FFFFFF;
+  --color-line: #E5E7EB;
+
+  --label: #0B0D12;
+  --label-2: #6B7280;
+  --label-3: #9CA3AF;
+
+  --color-accent: #4F46E5;
+  --color-ok: #22C55E;
+  --color-busy: #F59E0B;
+  --color-full: #EF4444;
+
+  --color-fill: rgba(11, 13, 18, 0.05);
+  --tint-ok: rgba(34, 197, 94, 0.12);
+  --tint-busy: rgba(245, 158, 11, 0.14);
+  --tint-full: rgba(239, 68, 68, 0.08);
+  --tint-accent: rgba(79, 70, 229, 0.1);
+  --stroke-full: rgba(239, 68, 68, 0.45);
+
+  --shaft-tick: rgba(11, 13, 18, 0.1);
+  --card-shadow: 0 1px 2px rgba(11, 13, 18, 0.05);
+
+  --peak-bg: #FEF3C7;
+  --peak-fg: #B45309;
+
+  --fav-border: rgba(79, 70, 229, 0.35);
+
+  --offline-bg: #FEF3C7;
+  --offline-fg: #B45309;
+  --backdrop: rgba(11, 13, 18, 0.35);
+  --skeleton: rgba(11, 13, 18, 0.05);
+
+  --glass: rgba(247, 248, 250, 0.72);
+  --glass-media: rgba(11, 13, 18, 0.45);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Атрибут hidden должен побеждать любые display из классов.
+   Без этого, например, .grid { display: grid } перебивает скрытие
+   и заглушки остаются на экране поверх настоящих карточек. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
+body {
+  /* Системный шрифт: SF Pro на технике Apple, шрифт платформы на остальных */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+               system-ui, 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--label);
+  -webkit-font-smoothing: antialiased;
+
+  /* Страховка от горизонтальной прокрутки — только на body.
+     На html это же правило делает его скролл-контейнером и ломает
+     position: sticky у навбара. */
+  overflow-x: hidden;
+
+  overflow-wrap: break-word; /* длинные слова не раздвигают карточки */
+  word-wrap: break-word;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+
+/* ── Матовое стекло ─────────────────────────────────────────
+   Только на панелях, под которыми что-то проезжает: навбары,
+   нижний тулбар, плашки и элементы поверх кадра камеры. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  transition: background-color var(--theme-shift), border-color var(--theme-shift);
+}
+
+/* Вариант поверх изображения: подложка всегда тёмная, без оглядки на тему */
+.glass--over-media {
+  background: var(--glass-media);
+  -webkit-backdrop-filter: saturate(150%) blur(14px);
+  backdrop-filter: saturate(150%) blur(14px);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+}
+
+/* Там, где размытие не поддерживается, панели просто становятся плотными */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .topbar, .navbar, .toolbar { background: var(--color-bg); }
+  .glass--over-media { background: var(--color-bg); }
+}
+
+/* ── Экраны и переходы ──────────────────────────────────── */
+.screen { max-width: 600px; margin: 0 auto; }
+.screen[hidden] { display: none; }
+
+.screen--push { animation: push 0.35s var(--ease) both; }
+.screen--pop  { animation: pop 0.35s var(--ease) both; }
+
+@keyframes push {
+  from { opacity: 0; transform: translate3d(18px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translate3d(-14px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Плашка офлайна: рисуем данные из кэша ──────────────── */
+.offline {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  border-radius: var(--r-control);
+  background: var(--offline-bg);
+  color: var(--offline-fg);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.offline[hidden] { display: none; }
+
+.offline .icon { width: 15px; height: 15px; }
+
+/* ── Компактный навбар списка: появляется при прокрутке ──── */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 25;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 0.5px solid transparent;
+  opacity: 0;
+  transform: translate3d(0, -6px, 0);
+  pointer-events: none;
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease),
+              border-color 0.28s var(--ease), top 0.28s var(--ease),
+              background-color var(--theme-shift);
+}
+
+/* Сдвиг под плашку офлайна, чтобы панели не накладывались */
+body.is-offline .topbar { top: var(--offline-h, 0px); }
+
+.topbar.is-visible {
+  opacity: 1;
+  transform: none;
+  border-bottom-color: var(--color-line);
+}
+
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.topbar__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+/* ── Крупный заголовок главного экрана ──────────────────── */
+.hero { padding: calc(22px + env(safe-area-inset-top)) 16px 4px; }
+
+.hero__brand {
+  display: inline-block;
+  cursor: pointer;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--label-2);
+}
+
+.hero__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero__title {
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+
+.hero__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.hero__sub {
+  margin-top: 3px;
+  font-size: 15px;
+  color: var(--label-2);
+  letter-spacing: -0.2px;
+}
+
+.hero__summary {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* Индикатор обновления данных */
+.live {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-ok);
+  transition: background-color 0.25s ease, opacity 0.25s ease;
+}
+
+.live.is-off { background: var(--color-full); }
+.live.is-blink { opacity: 0.3; }
+
+/* ── Общий статус системы в шапке ───────────────────────── */
+.sysbtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: opacity 0.3s ease, color 0.3s ease, transform 0.2s var(--ease),
+              background-color var(--theme-shift), border-color var(--theme-shift);
+}
+
+.sysbtn:active { transform: scale(0.93); }
+
+/* Пока данные не пришли — приглушаем */
+.sysbtn.is-loading { opacity: 0.5; }
+
+.sysbtn .icon { width: 20px; height: 20px; }
+
+/* Цвет берётся из общей ситуации по всем лифтам */
+.sysbtn[data-tone='ok']   { color: var(--color-ok); }
+.sysbtn[data-tone='busy'] { color: var(--color-busy); }
+.sysbtn[data-tone='full'] { color: var(--color-full); }
+
+/* ── Компактная кнопка (язык) ───────────────────────────── */
+.chipbtn {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-card);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--label-2);
+  cursor: pointer;
+  transition: background-color var(--theme-shift), border-color var(--theme-shift),
+              color 0.25s ease, transform 0.2s var(--ease);
+}
+
+.chipbtn:active { transform: scale(0.92); }
+
+/* ── Круглые кнопки-иконки в шапке: тема и уведомления ──── */
+.iconbtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-card);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--label-2);
+  cursor: pointer;
+  transition: background-color var(--theme-shift), border-color var(--theme-shift),
+              color var(--theme-shift), transform 0.2s var(--ease);
+}
+
+.iconbtn:active { transform: scale(0.9); }
+
+/* Подписка включена — колокольчик становится акцентным */
+.iconbtn.is-on { color: var(--color-accent); border-color: var(--fav-border); }
+
+#theme-icon { display: grid; place-items: center; line-height: 1; }
+
+/* ── Сетка карточек ─────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 16px 0;
+}
+
+/* ── Карточка лифта ─────────────────────────────────────── */
+.tile {
+  --status: var(--label-2);
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--r-card);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease),
+              background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.tile:active { transform: scale(0.97); }
+
+.tile[data-status='ok']   { --status: var(--color-ok); }
+.tile[data-status='busy'] { --status: var(--color-busy); }
+.tile[data-status='full'] { --status: var(--color-full); }
+
+/* Избранный лифт — мягкая акцентная рамка */
+.tile[data-fav='1'] {
+  box-shadow: inset 0 0 0 1px var(--fav-border), var(--card-shadow);
+}
+
+/* Переполненный лифт — тонкая красная обводка, без свечения */
+.tile[data-status='full'] {
+  box-shadow: inset 0 0 0 1.5px var(--stroke-full), var(--card-shadow);
+}
+
+/* Шапка карточки: название слева, звезда справа, бейдж статуса рядом.
+   Перенос обязателен: карточка в две колонки узкая, и длинное слово
+   «Обслуживание» иначе сжимает название лифта до нулевой ширины. */
+.tile__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tile__titles { flex: 1 1 auto; min-width: 0; }
+
+.tile__star {
+  flex: 0 0 auto;
+  order: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -4px -4px 0 0;
+  color: var(--label-3);
+  cursor: pointer;
+  transition: color 0.25s var(--ease), transform 0.2s var(--ease);
+}
+
+.tile__star .icon { width: 17px; height: 17px; }
+
+.tile__star:active { transform: scale(0.85); }
+
+/* Избранный лифт: звезда закрашена акцентом */
+.tile__star.is-on { color: var(--color-accent); }
+
+.tile__name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+}
+
+/* Адрес длинный, а колонка узкая — разрешаем перенос на вторую строку */
+.tile__loc {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* Этаж: шахта слева, крупная цифра справа */
+.tile__floor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+.tile__floor-num {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tile__floor-num b {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -1.6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__floor-num span {
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+/* ── Шахта лифта ────────────────────────────────────────── */
+.shaft {
+  --cab: 8px;
+
+  position: relative;
+  flex: 0 0 auto;
+  width: 6px;
+  height: 60px;
+  border-radius: 3px;
+  background: var(--color-line);
+  transition: background-color var(--theme-shift);
+}
+
+/* Крупный вариант на экране детали */
+.shaft--lg {
+  --cab: 16px;
+  width: 12px;
+  height: 200px;
+  border-radius: 6px;
+}
+
+/* Слой с рисками на экране детали — не влияет на раскладку */
+.shaft__ticks { position: absolute; inset: 0; }
+
+/* Риски этажей: выступают за края шахты, чтобы движение было заметнее */
+.shaft__tick {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 1px;
+  background: var(--shaft-tick);
+  transition: background-color var(--theme-shift);
+}
+
+.shaft--lg .shaft__tick { left: -5px; right: -5px; }
+
+/* Кабина: едет по шахте плавно, позицию задаёт app.js через bottom */
+.shaft__cabin {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--cab);
+  height: var(--cab);
+  margin-left: calc(var(--cab) / -2);
+  border-radius: 2.5px;
+  background: var(--color-accent);
+  transition: bottom 0.6s ease-in-out, background-color var(--theme-shift);
+}
+
+.shaft--lg .shaft__cabin { border-radius: 5px; }
+
+/* Стрелка направления движения */
+.dir {
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  color: var(--label-3);
+  transition: color 0.3s ease;
+}
+
+.dir .icon { width: 13px; height: 13px; }
+
+.dir.is-moving { color: var(--color-accent); }
+
+.tile__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.tile__row b {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--status);
+}
+
+/* Капсульная полоска заполненности */
+.bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-fill);
+  overflow: hidden;
+  transition: background-color var(--theme-shift);
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--status);
+  transition: width 0.45s var(--ease), background-color 0.25s ease;
+}
+
+.tile__wait {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 14px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.tile__wait-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tile__wait b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__wait svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--label-3);
+}
+
+/* Прогноз ожидания: часы + время */
+.tile__eta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 14px;
+  font-size: 12.5px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__eta svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--label-3);
+}
+
+/* Капсула-рекомендация */
+.pill {
+  display: inline-block;
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.pill--wait   { color: var(--color-ok); background: var(--tint-ok); }
+.pill--stairs { color: var(--color-busy); background: var(--tint-busy); }
+
+/* ── Подвал ─────────────────────────────────────────────── */
+.foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 12px;
+  color: var(--label-3);
+  letter-spacing: -0.05px;
+}
+
+/* ── Навигационная панель экрана детали ─────────────────── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  border-bottom: 0.5px solid var(--color-line);
+}
+
+/* Заголовок кликабелен: запасной способ вернуться там,
+   где нет системной кнопки «назад» (например, в браузере) */
+.navbar__titles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.navbar__titles:active { opacity: 0.5; }
+
+.navbar__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.navbar__subtitle {
+  font-size: 11.5px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── Контент экрана детали ──────────────────────────────── */
+.content {
+  display: grid;
+
+  /* Колонка обязательно minmax(0, 1fr): у грида неявная auto-колонка
+     растягивается до max-content своего содержимого, и лента этажей
+     (десять кнопок) раздувала весь экран шире телефона. */
+  grid-template-columns: minmax(0, 1fr);
+
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
+}
+
+.card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+  transition: background-color var(--theme-shift), box-shadow var(--theme-shift);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.card__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+}
+
+.card__caption {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--label-3);
+  letter-spacing: -0.05px;
+}
+
+.live-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.live-tag .icon { width: 11px; height: 11px; stroke-width: 2.2; }
+
+/* ── Выбор этажа назначения ─────────────────────────────── */
+/* Единственное место на экране с горизонтальной прокруткой */
+.floors {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 8px;
+  margin-top: 10px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.floors::-webkit-scrollbar { display: none; }
+
+.floor-pill {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 9px 0;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease),
+              border-color 0.25s var(--ease), transform 0.15s var(--ease);
+}
+
+.floor-pill:active { transform: scale(0.92); }
+
+/* Выбранный этаж — акцентная заливка */
+.floor-pill.is-active {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: #FFFFFF;
+}
+
+/* ── Кадр камеры ────────────────────────────────────────── */
+.camera {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-inner);
+  background: var(--color-line);
+  overflow: hidden;
+}
+
+.camera__scene, .camera__scene svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.camera__badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Карточки статистики ────────────────────────────────── */
+.stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* по той же причине, что и .content */
+  gap: 12px;
+  min-width: 0;
+}
+
+.metric { --status: var(--label-2); }
+
+.metric[data-status='ok']   { --status: var(--color-ok); }
+.metric[data-status='busy'] { --status: var(--color-busy); }
+.metric[data-status='full'] { --status: var(--color-full); }
+
+.metric__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.metric__value {
+  display: block;
+  min-width: 0;
+  overflow-wrap: break-word;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -1.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Крупная цифра «в кабине» окрашивается по статусу */
+.metric[data-status] .metric__value { color: var(--status); }
+
+.metric .bar { margin-top: 12px; height: 5px; }
+
+.metric__value--rec { font-size: 26px; letter-spacing: -0.8px; }
+.metric__value--rec.is-wait   { color: var(--color-ok); }
+.metric__value--rec.is-stairs { color: var(--color-busy); }
+
+/* Крупное значение с единицей измерения рядом */
+.metric__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.metric__unit {
+  font-size: 15px;
+  color: var(--label-2);
+  letter-spacing: -0.2px;
+}
+
+.metric__unit[hidden] { display: none; }
+
+/* ── Сравнение лифта с лестницей ────────────────────────── */
+.compare__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 0;
+  font-size: 15px;
+  color: var(--label-2);
+  border-bottom: 0.5px solid var(--color-line);
+  transition: color 0.3s ease, border-color var(--theme-shift);
+}
+
+.compare__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* иначе длинная подпись растянет строку наружу */
+}
+
+.compare__name .icon { width: 17px; height: 17px; color: var(--label-3); }
+
+.compare__time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Вариант, который выигрывает по времени, подсвечивается */
+.compare__row.is-faster { color: var(--label); }
+#cmp-elevator.is-faster .compare__time { color: var(--color-accent); }
+#cmp-stairs.is-faster   .compare__time { color: var(--color-ok); }
+
+.compare__verdict {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--label-2);
+  transition: color 0.3s ease;
+}
+
+.compare__verdict.is-stairs   { color: var(--color-ok); }
+.compare__verdict.is-elevator { color: var(--color-accent); }
+
+/* Карточка текущего этажа: текст слева, шахта справа */
+.metric--floor {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.metric__body { min-width: 0; }
+
+.metric__dir {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 8px;
+  color: var(--label-3);
+  transition: color 0.3s ease;
+}
+
+.metric__dir.is-moving { color: var(--color-accent); }
+
+/* ── Нижний тулбар с кнопкой ────────────────────────────── */
+.toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  border-top: 0.5px solid var(--color-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.toolbar__inner {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px 16px 12px;
+}
+
+/* ── Кнопка ─────────────────────────────────────────────── */
+.button {
+  width: 100%;
+  padding: 15px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: var(--tint-accent);
+  color: var(--color-accent);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s var(--ease),
+              background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.button:active { transform: scale(0.98); opacity: 0.7; }
+.button.is-busy { opacity: 0.45; pointer-events: none; }
+
+/* Сплошная акцентная — главное действие */
+.button--accent {
+  background: var(--color-accent);
+  color: #FFFFFF;
+}
+
+/* Контурная — второстепенное действие */
+.button--outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--label-2);
+  font-size: 15px;
+}
+
+/* Без фона — отмена */
+.button--ghost {
+  background: transparent;
+  color: var(--label-2);
+}
+
+/* ── Заглушки на время первой загрузки ──────────────────── */
+.skeleton {
+  display: block;
+  height: 232px;
+  border-radius: var(--r-card);
+  background: var(--skeleton);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ── Пустой экран ───────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px 32px;
+  animation: push 0.35s var(--ease) both;
+}
+
+.empty[hidden] { display: none; }
+
+.empty__art {
+  width: 120px;
+  height: 120px;
+  color: var(--label-3);
+  margin-bottom: 22px;
+}
+
+.empty__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.empty__text {
+  margin: 8px 0 24px;
+  max-width: 300px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.empty .button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-width: 180px;
+  padding: 13px 24px;
+  border-radius: 999px;
+}
+
+.empty .button .icon { width: 17px; height: 17px; }
+
+/* ── Модалка «сообщить о проблеме» ──────────────────────── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--backdrop);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.25s ease both;
+}
+
+.sheet-backdrop[hidden] { display: none; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--color-card);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.32s var(--ease) both;
+  transition: background-color var(--theme-shift);
+}
+
+.sheet[hidden] { display: none; }
+
+/* Закрытие: уезжает вниз */
+.sheet.is-closing { animation: slideDown 0.26s var(--ease) both; }
+.sheet-backdrop.is-closing { animation: fadeOut 0.26s ease both; }
+
+@keyframes slideUp   { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes slideDown { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fadeOut   { from { opacity: 1; } to { opacity: 0; } }
+
+.sheet__grabber {
+  width: 36px;
+  height: 5px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: var(--color-line);
+}
+
+.sheet__title {
+  margin-bottom: 14px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.sheet__options { display: grid; gap: 8px; }
+
+.sheet__option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--label);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+/* Выбранная причина */
+.sheet__option.is-active {
+  border-color: var(--color-accent);
+  background: var(--tint-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.sheet__label {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--label-2);
+}
+
+.sheet__textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  resize: none;
+  transition: border-color 0.2s var(--ease), background-color var(--theme-shift);
+}
+
+.sheet__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.sheet__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ── Тост ───────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  z-index: 50;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 13px 20px;
+  border-radius: 999px;
+  background: var(--color-card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), inset 0 0 0 1px var(--color-line);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  text-align: center;
+  animation: toastIn 0.3s var(--ease) both;
+}
+
+.toast[hidden] { display: none; }
+.toast.is-closing { animation: toastOut 0.3s var(--ease) both; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, 14px); }
+}
+
+/* ── Микроанимация цифр ─────────────────────────────────────
+   Класс вешается на момент смены значения: цифра чуть подпрыгивает. */
+.number-changed { animation: numberPop 0.4s ease-out; }
+
+/* Подскок делается через transform, а он не работает на строчных элементах */
+.tile__row b,
+.tile__wait b,
+.tile__eta b,
+.sysbtn span { display: inline-block; }
+
+@keyframes numberPop {
+  0%   { transform: translateY(5px); opacity: 0.45; }
+  60%  { transform: translateY(-1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Узкие экраны */
+@media (max-width: 340px) {
+  .hero__title { font-size: 30px; }
+  .tile__floor-num b { font-size: 34px; }
+  .metric__value { font-size: 30px; }
+  .shaft { height: 52px; }
+}
+
+/* ==========================================================================
+   SVG-иконки
+   Весь интерфейс рисуется спрайтом из icons.svg — эмодзи в разметке нет.
+   Иконка по умолчанию размером со строку текста (1em) и красится
+   currentColor, поэтому одна и та же картинка работает и серой подписью,
+   и красным статусом.
+   ========================================================================== */
+
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.15em;
+  flex: 0 0 auto;
+}
+
+.icon--ok      { color: var(--color-ok); }
+.icon--busy    { color: var(--color-busy); }
+.icon--full    { color: var(--color-full); }
+.icon--accent  { color: var(--color-accent); }
+.icon--muted   { color: var(--label-2); }
+
+.icon--large { width: 1.5em; height: 1.5em; }
+
+/* «Живая» иконка: онлайн-камера, индикатор связи */
+.icon--pulse { animation: pulse 2s infinite; }
+
+/* Кнопка обновления: оборот при нажатии */
+.icon--spin { animation: iconSpin 0.6s var(--ease); }
+
+@keyframes iconSpin { to { transform: rotate(360deg); } }
+
+/* Колокольчик качается, когда настройки уведомлений сохранены */
+.icon--swing { animation: iconSwing 0.7s ease; transform-origin: 50% 15%; }
+
+@keyframes iconSwing {
+  0%, 100% { transform: rotate(0); }
+  15%      { transform: rotate(14deg); }
+  35%      { transform: rotate(-11deg); }
+  55%      { transform: rotate(7deg); }
+  75%      { transform: rotate(-4deg); }
+}
+
+/* ==========================================================================
+   Статус работы лифта
+   Это не загруженность: сломанный лифт не «переполнен», он просто не везёт.
+   ========================================================================== */
+
+/* ── Сводка «Работают 4 из 6» под шапкой ────────────────── */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 10px 13px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift);
+}
+
+.notice--warn { background: var(--peak-bg); color: var(--peak-fg); }
+.notice .icon { width: 16px; height: 16px; }
+
+/* ── Бейдж на карточке: рядом со звездой ────────────────── */
+.badge {
+  flex: 0 0 auto;
+  order: 3;
+  margin-left: auto; /* на своей строке прижимается к правому краю */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -2px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.05px;
+  white-space: nowrap;
+}
+
+.badge .icon { width: 12px; height: 12px; stroke-width: 2; }
+
+.badge[data-work='broken']      { background: var(--tint-full); color: var(--color-full); }
+.badge[data-work='maintenance'] { background: var(--tint-busy); color: var(--color-busy); }
+
+/* ── Карточка неработающего лифта ───────────────────────── */
+
+/* Сломанный уходит на второй план и перечёркнут: по нему решать нечего */
+.tile[data-work='broken'] { opacity: 0.5; }
+.tile[data-work='broken'] .tile__name { text-decoration: line-through; }
+
+/* Обслуживание — жёлтая обводка вместо красной рамки статуса */
+.tile[data-work='maintenance'] {
+  box-shadow: inset 0 0 0 1.5px var(--color-busy), var(--card-shadow);
+}
+
+/* Прочерк вместо значения: приглушён и заметно мельче самой цифры,
+   иначе тире кеглем в 38 пикселей читается как жирная черта. */
+.is-dash {
+  font-size: 0.7em;
+  color: var(--label-3) !important;
+  letter-spacing: 0;
+}
+
+/* Таблетка рекомендации у неработающего лифта */
+.pill--down { color: var(--label-3); background: var(--color-fill); }
+
+/* ── Плашка вместо камеры на экране детали ──────────────── */
+.card--down {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.card--down[data-work='broken']      { color: var(--color-full); }
+.card--down[data-work='maintenance'] { color: var(--color-busy); }
+
+.card--down .icon { width: 34px; height: 34px; stroke-width: 1.5; }
+
+.down__title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.down__note {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--label-2);
+}
+
+/* ==========================================================================
+   Прогноз диапазоном
+   ========================================================================== */
+
+/* Подпись с точкой уверенности в одной строке */
+.metric__label--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Точка уверенности: зелёная — прогноз надёжный, серая — грубый */
+.confidence {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--label-3);
+  transition: background-color 0.3s ease;
+}
+
+.confidence[data-level='high']   { background: var(--color-ok); }
+.confidence[data-level='medium'] { background: var(--color-busy); }
+.confidence[data-level='low']    { background: var(--label-3); }
+
+/* Диапазон «~25–40 сек» заметно длиннее одной цифры */
+.metric__value--range { font-size: 26px; letter-spacing: -0.7px; }
+
+/* Та же точка в углу карточки на главном экране */
+.tile__eta .confidence { width: 6px; height: 6px; }
+
+/* ==========================================================================
+   Плашка «мой этаж»
+   ========================================================================== */
+
+.floorbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 0;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  text-align: left;
+  cursor: pointer;
+  animation: push 0.3s var(--ease) both;
+  transition: background-color var(--theme-shift), color var(--theme-shift),
+              transform 0.2s var(--ease);
+}
+
+.floorbar:active { transform: scale(0.985); }
+
+/* Текст и подпись в колонку, чтобы подпись не растягивала плашку */
+.floorbar__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* «Дольше всего у лифта 3» — мельче и приглушённее основной строки */
+.floorbar__hint {
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.75;
+  letter-spacing: 0;
+}
+
+.floorbar__hint[hidden] { display: none; }
+
+.floorbar[data-level='ok']   { background: var(--tint-ok); color: var(--color-ok); }
+.floorbar[data-level='busy'] { background: var(--tint-busy); color: var(--color-busy); }
+.floorbar[data-level='full'] { background: var(--tint-full); color: var(--color-full); }
+
+.floorbar .icon { width: 16px; height: 16px; }
+
+/* Стрелка «открыть» прижата к правому краю и приглушена */
+.floorbar__go { margin-left: auto; opacity: 0.6; }
+
+/* ==========================================================================
+   Настройки уведомлений
+   ========================================================================== */
+
+/* Длинная модалка прокручивается внутри себя, кнопки остаются видны */
+.sheet__scroll {
+  max-height: 58vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Переключатель ──────────────────────────────────────── */
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease);
+}
+
+.switch__text {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.switch__text .icon { width: 17px; height: 17px; color: var(--label-2); }
+
+/* Сам чекбокс не виден, но остаётся доступным с клавиатуры */
+.switch__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch__track {
+  flex: 0 0 auto;
+  position: relative;
+  width: 50px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--color-fill);
+  transition: background-color 0.25s var(--ease);
+}
+
+.switch__track i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s var(--ease);
+}
+
+.switch__input:checked ~ .switch__track { background: var(--color-accent); }
+.switch__input:checked ~ .switch__track i { transform: translateX(20px); }
+
+.switch__input:focus-visible ~ .switch__track {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Выключенные уведомления — типы и порог приглушаются */
+.sheet__scroll.is-muted .checks,
+.sheet__scroll.is-muted .slider,
+.sheet__scroll.is-muted #notif-floors { opacity: 0.4; pointer-events: none; }
+
+/* ── Чекбоксы типов ─────────────────────────────────────── */
+.checks { display: grid; gap: 8px; }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-inner);
+  font-size: 14.5px;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+.check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Квадратик с галочкой: саму галочку показываем только отмеченной */
+.check__box {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--color-line);
+  border-radius: 7px;
+  color: transparent;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease),
+              color 0.2s var(--ease);
+}
+
+.check__box .icon { width: 14px; height: 14px; stroke-width: 2.6; }
+
+.check input:checked ~ .check__box {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #FFFFFF;
+}
+
+.check:has(input:checked) { border-color: var(--fav-border); }
+
+.check input:focus-visible ~ .check__box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Ползунок порога ────────────────────────────────────── */
+.slider__input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+/* ══ Прогноз, кольцо ожидания, заглушки и новые модалки ═══ */
+
+/* ── Строка тенденции под плашкой очереди ───────────────── */
+.trendline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0 2px;
+  font-size: 13.5px;
+  letter-spacing: -0.1px;
+  color: var(--color-busy);
+}
+
+.trendline[data-trend='falling'] { color: var(--color-ok); }
+
+/* ── Кольцо обратного отсчёта ───────────────────────────── */
+.wait {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wait__ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+}
+
+.wait__ring svg {
+  width: 100%;
+  height: 100%;
+  /* Отсчёт начинается сверху, а не справа */
+  transform: rotate(-90deg);
+}
+
+.wait__track,
+.wait__arc {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.wait__track { stroke: var(--color-fill); }
+
+.wait__arc {
+  stroke: var(--color-accent);
+  /* Длина окружности при r = 34. Смещение задаёт app.js. */
+  stroke-dasharray: 213.6;
+  stroke-dashoffset: 213.6;
+  transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+}
+
+.wait__count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+
+.wait__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wait__state {
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.1px;
+}
+
+.wait__state[hidden] { display: none; }
+
+/* Прогноз истёк: кабина должна быть здесь */
+.wait__ring[data-state='done'] .wait__arc { stroke: var(--color-ok); }
+.wait__ring[data-state='done'] .wait__count { color: var(--color-ok); }
+.wait__ring[data-state='done'] ~ .wait__body .wait__state { color: var(--color-ok); }
+
+/* Прогноз превышен в полтора раза: лифт явно задерживается */
+.wait__ring[data-state='late'] .wait__arc {
+  stroke: var(--color-full);
+  animation: ring-pulse 1.3s ease-in-out infinite;
+}
+
+.wait__ring[data-state='late'] .wait__count { color: var(--color-full); }
+.wait__ring[data-state='late'] ~ .wait__body .wait__state { color: var(--color-full); }
+
+@keyframes ring-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wait__arc { transition: none; animation: none; }
+}
+
+/* ── Карточка прогноза на экране лифта ──────────────────── */
+.forecast {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.forecast__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.forecast__row:last-child { border-bottom: none; }
+
+.forecast__when {
+  flex: 0 0 auto;
+  font-size: 13.5px;
+  color: var(--label-2);
+}
+
+.forecast__row--now .forecast__when { color: var(--label); }
+
+.forecast__value {
+  min-width: 0;
+  text-align: right;
+  font-size: 15px;
+  letter-spacing: -0.2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast__row--now .forecast__value { font-weight: 600; }
+
+.forecast__warmup {
+  display: block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--label-3);
+}
+
+/* Стрелка тенденции рядом с заголовком карточки */
+.trend-mark { color: var(--color-full); }
+.trend-mark[data-trend='falling'] { color: var(--color-ok); }
+.trend-mark[hidden] { display: none; }
+
+/* ── Заглушки с внутренней структурой ───────────────────── */
+.skeleton__line {
+  display: block;
+  border-radius: 6px;
+  background: var(--skeleton);
+}
+
+/* Внутренности карточки-заглушки повторяют настоящую карточку */
+.skeleton--tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 232px;
+  padding: 16px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-card);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton--tile .skeleton__line:nth-child(1) { width: 56%; height: 14px; }
+.skeleton--tile .skeleton__line:nth-child(2) { width: 42%; height: 34px; margin-top: 6px; }
+.skeleton--tile .skeleton__line:nth-child(3) { width: 72%; height: 12px; }
+.skeleton--tile .skeleton__line:nth-child(4) { width: 64%; height: 12px; }
+.skeleton--tile .skeleton__line:nth-child(5) {
+  width: 44%;
+  height: 30px;
+  border-radius: 999px;
+  margin-top: auto;
+}
+
+.detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton--camera  { height: 196px; }
+.skeleton--metric  { height: 104px; }
+.skeleton--compare { height: 148px; }
+
+/* ── Две кнопки в ряд на экране лифта ───────────────────── */
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.actions .button { width: 100%; }
+
+@media (max-width: 360px) {
+  .actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Модалка «поделиться» ───────────────────────────────── */
+.share__preview {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  max-height: 180px;
+  overflow: auto;
+  background: var(--color-fill);
+  border-radius: var(--r-inner);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--label-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.share__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* ── Строка-ссылка и карточка подписки в настройках ─────── */
+.linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  background: var(--color-fill);
+  border-radius: var(--r-inner);
+  color: var(--label);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.linkrow__text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.linkrow__go { color: var(--label-3); }
+
+.sheet__hint {
+  margin: -2px 0 0;
+  padding: 0 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--label-3);
+}
+
+.promo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--tint-accent);
+  border-radius: var(--r-inner);
+}
+
+.promo__title { font-size: 16px; letter-spacing: -0.3px; }
+
+.promo__text {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.promo .button { margin-top: 4px; }
+
+/*
+ * Большая карточка приглашения на экране «О проекте». Та же подложка,
+ * что у карточки в настройках, но с иконкой-значком и крупным
+ * заголовком: здесь приглашение — главное на экране, а не строка в
+ * списке настроек.
+ */
+.promo--large {
+  gap: 10px;
+  padding: 20px 18px;
+  text-align: center;
+  align-items: center;
+}
+
+.promo--large .promo__title { font-size: 19px; }
+.promo--large .promo__text { max-width: 30ch; }
+.promo--large .button { width: 100%; }
+
+.promo__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  /* Иконка приезжает чуть позже карточки — экран открывается мягче */
+  animation: promo-badge 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.promo__badge .icon { width: 24px; height: 24px; }
+
+@keyframes promo-badge {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo__badge { animation: none; }
+}
+
+/* ══ Экран «О проекте» ═══════════════════════════════════ */
+
+.about__card { display: flex; flex-direction: column; gap: 10px; }
+
+.about__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  letter-spacing: -0.2px;
+}
+
+.about__head .icon { color: var(--label-3); }
+
+.about__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+/* Факты о корпусе: подпись слева, значение справа */
+.about__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 12px;
+  margin: 0;
+}
+
+.about__facts dt {
+  font-size: 14px;
+  color: var(--label-2);
+  min-width: 0;
+}
+
+.about__facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Строка «О проекте» в настройках — кнопка, а не ссылка */
+button.linkrow {
+  width: 100%;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ══ Планировщик выхода ══════════════════════════════════ */
+
+.plan__intro {
+  margin: 0 2px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--label-2);
+  letter-spacing: -0.05px;
+}
+
+.field__input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  border-radius: var(--r-inner);
+  color: var(--label);
+  font: inherit;
+  font-size: 16px;            /* меньше 16px — iOS зумит страницу при фокусе */
+  line-height: 1.2;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* У select нужна своя стрелка: системную мы сняли через appearance */
+select.field__input {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--label-3) 50%),
+    linear-gradient(135deg, var(--label-3) 50%, transparent 50%);
+  background-position: right 18px center, right 13px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.button--wide { width: 100%; }
+
+.plan__result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.plan__status {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  background: var(--tint-ok);
+  color: var(--color-ok);
+}
+
+.plan__result[data-status='soon'] .plan__status {
+  background: var(--tint-busy);
+  color: var(--color-busy);
+}
+
+.plan__result[data-status='now'] .plan__status {
+  background: var(--tint-full);
+  color: var(--color-full);
+}
+
+.plan__exit {
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -1.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan__explain {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+.plan__source {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--label-3);
+}
+
+.plan__result .button { margin-top: 6px; }
+
+#plan-back { margin-top: 14px; }
