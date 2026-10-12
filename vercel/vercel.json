@@ -1,17 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node scripts/sync-from-shared.js || true",
+  "version": 2,
+  "buildCommand": "",
   "outputDirectory": "public",
-  "functions": {
-    "api/**/*.js": {
-      "memory": 512,
-      "maxDuration": 10
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/notify",
-      "schedule": "0 * * * *"
-    }
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
