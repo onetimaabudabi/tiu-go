@@ -26,6 +26,13 @@
   --tint-busy: rgba(245, 158, 11, 0.14);
   --tint-full: rgba(239, 68, 68, 0.12);
   --tint-accent: rgba(91, 141, 239, 0.14);
+
+  /* Фирменный цвет Telegram: плашка канала и кнопка подписки.
+     В обеих темах один и тот же — это чужой бренд, а не наша палитра. */
+  --tg: #229ed9;
+  --tg-deep: #1c8ec2;
+  --tg-tint: rgba(34, 158, 217, 0.15);
+  --tg-line: rgba(34, 158, 217, 0.28);
   --stroke-full: rgba(239, 68, 68, 0.5);
 
   --shaft-tick: rgba(255, 255, 255, 0.12);
@@ -2142,3 +2149,137 @@ select.field__input {
 .plan__result .button { margin-top: 6px; }
 
 #plan-back { margin-top: 14px; }
+
+/* ══ Плашка канала ═══════════════════════════════════════ */
+/*
+ * Стоит над сеткой карточек — это единственное место, где ссылку
+ * видно без единого тапа. Появляется, только если сервер прислал
+ * channelUrl, иначе скрыта целиком.
+ */
+
+.channel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Боковые отступы — как у сетки карточек: плашка стоит в том же
+     поле набора, а не распирает экран от края до края. */
+  margin: 18px 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--tg-line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--tg-tint), rgba(28, 142, 194, 0.08));
+  color: var(--label);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform 0.15s ease, border-color var(--theme-shift);
+}
+
+.channel:active { transform: scale(0.98); }
+
+.channel__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--tg), var(--tg-deep));
+  color: #fff;
+}
+
+.channel__mark .icon { width: 20px; height: 20px; }
+
+.channel__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.channel__text b { font-size: 14.5px; letter-spacing: -0.2px; }
+
+.channel__text span {
+  font-size: 12.5px;
+  color: var(--label-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel__go { flex: 0 0 auto; width: 16px; height: 16px; color: var(--tg); }
+
+/* Кнопка подписки на экране «О проекте» */
+.button--telegram {
+  background: linear-gradient(135deg, var(--tg), var(--tg-deep));
+  color: #fff;
+  border: none;
+}
+
+.button--telegram:active { transform: scale(0.98); }
+
+/* Строка в подвале */
+.foot__link {
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--tg);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ══ Приоритет для пассажиров с ОВЗ ══════════════════════ */
+/*
+ * Напоминание, а не предупреждение: поэтому ни красного, ни рамки,
+ * ни восклицательных знаков. На карточке — тонкая серая строка,
+ * на экране лифта — мягкая плашка акцентного цвета.
+ */
+
+.tile__priority {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--label-3);
+}
+
+.tile__priority .icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+.priority {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--tint-accent);
+}
+
+.priority__icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--color-accent);
+}
+
+.priority__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--label-2);
+}

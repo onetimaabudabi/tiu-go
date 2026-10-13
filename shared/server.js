@@ -789,7 +789,9 @@ function buildStatus(destination, options) {
     // Прогноз по холлу: сколько человек будет стоять внизу через 5 и 10 минут
     forecast: forecastHall(raw),
     // Ссылка на канал проекта — берётся из .env, фронтенд её только открывает
-    channelUrl: process.env.TELEGRAM_CHANNEL_URL || null,
+    // Канал у проекта есть всегда, поэтому запасное значение — он сам.
+    // Переменная нужна, только чтобы подменить адрес, не трогая код.
+    channelUrl: process.env.TELEGRAM_CHANNEL_URL || 'https://t.me/tiu_go',
     // Публичный адрес мини-аппа: из него собирается ссылка «поделиться»
     appUrl: process.env.WEBAPP_URL || null,
     elevators

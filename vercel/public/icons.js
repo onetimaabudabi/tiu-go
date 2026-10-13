@@ -41,7 +41,9 @@
     'flame', 'zap', 'stairs', 'camera',
     'signal', 'signal-low', 'signal-medium', 'signal-high',
 
-    'trend-up', 'trend-down', 'telegram', 'copy', 'route'
+    'trend-up', 'trend-down', 'telegram', 'copy', 'route',
+
+    'heart-hands', 'external-link'
   ];
 
   /**

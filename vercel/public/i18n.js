@@ -220,10 +220,21 @@
       'subscribe.button': 'Открыть канал',
       'subscribe.missing': 'Ссылка на канал пока не настроена',
 
+      // ---------- Плашка канала ----------
+      'channel.title': 'Новости TIU GO',
+      'channel.subtitle': 'Обновления, бета-версии, анонсы',
+      'channel.subscribe': 'Подписаться на канал',
+      'channel.follow': 'Следи за новостями проекта',
+      'channel.about': 'Присоединяйся к нашему каналу в Telegram — там мы публикуем обновления приложения, анонсы бета-версий и результаты опросов.',
+      'channel.footer': 'Мы в Telegram: @tiu_go',
+
+      // ---------- Приоритет для пассажиров с ОВЗ ----------
+      'priority.short': 'Приоритет — людям с ОВЗ',
+      'priority.detail': 'Сначала пропустите пассажиров с ограниченными возможностями здоровья и людей с колясками. Уступите место у кнопок.',
+
       // ---------- Экран «О проекте» ----------
       'about.open': 'О проекте',
       'about.title': 'О проекте',
-      'about.channelText': 'Бета-версия, новые корпуса и всё, что мы чиним по дороге, — сначала в канале, потом везде.',
       'about.what': 'Что это',
       'about.whatText': 'TIU GO показывает, свободны ли лифты, пока ты ещё идёшь к корпусу. Сколько человек в кабине, на каком она этаже и сколько ждать — видно до того, как встанешь в очередь.',
       'about.facts': 'Коротко о корпусе',
@@ -435,10 +446,21 @@
       'subscribe.button': 'Open channel',
       'subscribe.missing': 'The channel link is not configured yet',
 
+      // ---------- Channel banner ----------
+      'channel.title': 'TIU GO News',
+      'channel.subtitle': 'Updates, betas, announcements',
+      'channel.subscribe': 'Subscribe to channel',
+      'channel.follow': 'Follow project news',
+      'channel.about': 'Join our Telegram channel — we post app updates, beta announcements and survey results there.',
+      'channel.footer': "We're on Telegram: @tiu_go",
+
+      // ---------- Priority for passengers with disabilities ----------
+      'priority.short': 'Priority — people with disabilities',
+      'priority.detail': 'Please let passengers with disabilities and strollers go first. Give up space near the buttons.',
+
       // ---------- About screen ----------
       'about.open': 'About the project',
       'about.title': 'About the project',
-      'about.channelText': 'The beta, new buildings and everything we fix along the way show up in the channel first.',
       'about.what': 'What this is',
       'about.whatText': 'TIU GO shows whether the lifts are free while you are still walking to the building. How many people are in the cabin, which floor it is on and how long the wait is — all before you join the queue.',
       'about.facts': 'The building in short',
@@ -655,10 +677,21 @@
       'subscribe.button': '打开频道',
       'subscribe.missing': '频道链接尚未配置',
 
+      // ---------- 频道横幅 ----------
+      'channel.title': 'TIU GO 频道',
+      'channel.subtitle': '更新、测试版、公告',
+      'channel.subscribe': '订阅频道',
+      'channel.follow': '关注项目动态',
+      'channel.about': '欢迎加入我们的 Telegram 频道：应用更新、测试版公告和问卷结果都会先发布在那里。',
+      'channel.footer': 'Telegram：@tiu_go',
+
+      // ---------- 无障碍优先 ----------
+      'priority.short': '残障人士优先',
+      'priority.detail': '请先让行动不便的乘客和推婴儿车的人先行，并让出按钮旁的位置。',
+
       // ---------- 关于项目 ----------
       'about.open': '关于项目',
       'about.title': '关于项目',
-      'about.channelText': '测试版、新楼栋以及我们一路修复的内容，都会先发布在频道里。',
       'about.what': '这是什么',
       'about.whatText': 'TIU GO 让你在走向楼栋的路上就知道电梯是否空闲：轿厢里有多少人、停在哪一层、还要等多久，排队之前就能看到。',
       'about.facts': '楼栋概况',

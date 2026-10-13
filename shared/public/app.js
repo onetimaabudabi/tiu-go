@@ -124,6 +124,8 @@
     channelOpen: $('channel-open'),
     channelPromo: $('channel-promo'),
     channelButton: $('channel-button'),
+    channelBanner: $('channel-banner'),
+    channelFoot: $('channel-foot'),
 
     // Экран «О проекте»
     about: $('screen-about'),
@@ -1037,7 +1039,12 @@
       '<span class="tile__eta">' + icon('clock') + '<b></b>' +
         '<i class="confidence" data-level="high"></i></span>' +
 
-      '<span class="pill"></span>';
+      '<span class="pill"></span>' +
+
+      // Приоритет для пассажиров с ОВЗ. Тонкая строка под рекомендацией:
+      // напоминание, а не предупреждение, поэтому серым и мелким.
+      '<span class="tile__priority">' + icon('heart-hands') +
+        '<span>' + t('priority.short') + '</span></span>';
 
     return {
       root: root,
@@ -1058,13 +1065,18 @@
       waiting: root.querySelector('.tile__wait b'),
       eta: root.querySelector('.tile__eta b'),
       confidence: root.querySelector('.tile__eta .confidence'),
-      pill: root.querySelector('.pill')
+      pill: root.querySelector('.pill'),
+      priority: root.querySelector('.tile__priority span')
     };
   }
 
   /** Обновляет значения в уже построенной карточке. */
   function updateTile(tile, lift) {
     var down = isDown(lift);
+
+    // Текст строится один раз при сборке карточки, но язык можно
+    // переключить в любой момент — поэтому обновляем здесь
+    setText(tile.priority, t('priority.short'));
 
     if (tile.root.dataset.status !== lift.status) {
       tile.root.dataset.status = lift.status;
@@ -1977,6 +1989,8 @@
     el.channelOpen.hidden = !has;
     el.channelPromo.hidden = !has;
     el.aboutChannel.hidden = !has;
+    el.channelBanner.hidden = !has;
+    el.channelFoot.hidden = !has;
   }
 
   function openChannel() {
@@ -2684,6 +2698,8 @@
   el.channelOpen.addEventListener('click', openChannel);
   el.channelButton.addEventListener('click', openChannel);
   el.aboutChannelButton.addEventListener('click', openChannel);
+  el.channelBanner.addEventListener('click', openChannel);
+  el.channelFoot.addEventListener('click', openChannel);
 
   el.aboutLink.addEventListener('click', function () {
     haptic();
