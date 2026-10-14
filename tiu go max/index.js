@@ -14,6 +14,7 @@
  *       (здесь используется схема: GET /updates, POST /messages,
  *        attachment типа inline_keyboard с кнопкой типа link).
  */
+const http = require('http');
 const https = require('https');
 const path = require('path');
 const axios = require('axios');
@@ -193,3 +194,40 @@ console.log('[MAX] Мини-апп:', WEBAPP_URL);
 console.log('[MAX] Напишите боту /start в MAX.');
 
 pollLoop();
+
+// ---------- Мини-HTTP-сервер для Render ----------
+//
+// Бот работает через long polling и сам порт не слушает, а Render ждёт от
+// Web Service открытый порт: без него деплой отменяется с «No open ports
+// detected». Этот сервер нужен только для проверки живости — на логику
+// бота он не влияет.
+
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      service: 'tiu-go-max',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    }));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+// Занятый порт не должен ронять бота: на Render такого не случится,
+// а локально 3000 уже может держать общий сервер мини-аппа.
+server.on('error', (err) => {
+  console.error('[HTTP] Не удалось поднять health-check сервер:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[HTTP] Порт ${PORT} занят. Бот продолжает работать без него.`);
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`[HTTP] Health-check сервер запущен на порту ${PORT}`);
+});
