@@ -10,6 +10,8 @@
     "start:telegram": "node \"tiu go tg/index.js\"",
     "start:max": "node \"tiu go max/index.js\"",
     "screenshots": "node screenshots/capture.js",
+    "presentation": "node presentation/generate.js",
+    "presentation:preview": "node presentation/preview.js",
     "mockup": "node screenshots/capture.js --mockup-only",
     "check:params": "node scripts/check-params.js",
     "3d:dev": "vite 3d-sim",
@@ -65,6 +67,7 @@
     "exceljs": "^4.4.0",
     "mathjs": "^15.2.0",
     "puppeteer": "^23.6.0",
+    "qrcode": "^1.5.4",
     "three": "^0.160.1",
     "vite": "^5.4.21"
   }
