@@ -228,6 +228,17 @@
       'channel.about': 'Присоединяйся к нашему каналу в Telegram — там мы публикуем обновления приложения, анонсы бета-версий и результаты опросов.',
       'channel.footer': 'Мы в Telegram: @tiu_go',
 
+      // ---------- Вкладки и экран «Новости» ----------
+      'tab.elevators': 'Лифты',
+      'tab.news': 'Новости',
+
+      'news.title': 'Новости ТИУ',
+      'news.subtitle': 'Скоро здесь появятся новости университета',
+      'news.inDevelopment': 'Функция в разработке',
+      'news.description': 'Мы работаем над интеграцией с новостными каналами ТИУ. Здесь появятся свежие новости университета — прямо в приложении.',
+      'news.eta': 'Ожидаемое время: скоро',
+      'news.followChannel': 'Следите за обновлениями в нашем Telegram-канале',
+
       // ---------- Приоритет для пассажиров с ОВЗ ----------
       'priority.short': 'Приоритет — людям с ОВЗ',
       'priority.detail': 'Сначала пропустите пассажиров с ограниченными возможностями здоровья и людей с колясками. Уступите место у кнопок.',
@@ -453,6 +464,17 @@
       'channel.follow': 'Follow project news',
       'channel.about': 'Join our Telegram channel — we post app updates, beta announcements and survey results there.',
       'channel.footer': "We're on Telegram: @tiu_go",
+
+      // ---------- Вкладки и экран «Новости» ----------
+      'tab.elevators': 'Elevators',
+      'tab.news': 'News',
+
+      'news.title': 'TIU News',
+      'news.subtitle': 'University news will appear here soon',
+      'news.inDevelopment': 'Feature in development',
+      'news.description': 'We are working on integration with TIU news channels. Fresh university news will appear here — right in the app.',
+      'news.eta': 'Expected: soon',
+      'news.followChannel': 'Follow updates in our Telegram channel',
 
       // ---------- Priority for passengers with disabilities ----------
       'priority.short': 'Priority — people with disabilities',
@@ -684,6 +706,17 @@
       'channel.follow': '关注项目动态',
       'channel.about': '欢迎加入我们的 Telegram 频道：应用更新、测试版公告和问卷结果都会先发布在那里。',
       'channel.footer': 'Telegram：@tiu_go',
+
+      // ---------- Вкладки и экран «Новости» ----------
+      'tab.elevators': '电梯',
+      'tab.news': '新闻',
+
+      'news.title': '秋明工大新闻',
+      'news.subtitle': '大学新闻即将在这里显示',
+      'news.inDevelopment': '功能开发中',
+      'news.description': '我们正在接入秋明工业大学的新闻频道。届时校园最新消息将直接显示在应用里。',
+      'news.eta': '预计时间：即将上线',
+      'news.followChannel': '请关注我们的 Telegram 频道获取更新',
 
       // ---------- 无障碍优先 ----------
       'priority.short': '残障人士优先',

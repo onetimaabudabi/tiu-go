@@ -43,7 +43,9 @@
 
     'trend-up', 'trend-down', 'telegram', 'copy', 'route',
 
-    'heart-hands', 'external-link'
+    'heart-hands', 'external-link',
+
+    'news', 'construction'
   ];
 
   /**

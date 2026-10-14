@@ -2309,3 +2309,140 @@ select.field__input {
   line-height: 1.45;
   color: var(--label-2);
 }
+
+/* ==========================================================================
+   Нижний таб-бар и экран «Новости»
+   ========================================================================== */
+
+/*
+ * Два раздела верхнего уровня: лифты и новости.
+ *
+ * Панель прижата к низу и живёт над контентом, но под модалками: слой 30
+ * выше навбара и тулбара (20–25) и ниже подложки шторок (40) и тоста (50).
+ * Иначе таб-бар висел бы поверх открытой шторки.
+ */
+
+:root {
+  --tabbar-h: 60px;
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+
+  display: flex;
+  max-width: 600px;          /* как у .screen: на планшете панель не растягивается */
+  margin: 0 auto;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-card);
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: background-color var(--theme-shift), border-color var(--theme-shift);
+}
+
+/* На вложенных экранах панели нет: там своя навигация */
+.tabbar[hidden] { display: none; }
+
+.tabbar__item {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--tabbar-h);
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--label-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.05px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: color 0.2s ease, transform 0.2s var(--ease);
+}
+
+.tabbar__item:active { transform: scale(0.94); }
+
+.tabbar__item.is-active { color: var(--color-accent); }
+
+/* Иконка в панели крупнее текстовой: подпись под ней совсем мелкая */
+.icon--tab { width: 22px; height: 22px; }
+
+/* Контент не должен уезжать под панель */
+.screen--tabbed { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
+
+/* Тост поднимается над панелью, пока она на экране */
+body.has-tabbar .toast {
+  bottom: calc(28px + var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+/* ── Экран «Новости»: блок-заглушка ─────────────────────── */
+
+.stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 32px 24px;
+  border-radius: var(--r-card);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+  text-align: center;
+}
+
+.stub__badge {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--tint-accent);
+  color: var(--color-accent);
+}
+
+.stub__badge .icon { width: 64px; height: 64px; stroke-width: 1.5; }
+
+.stub__title {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--label);
+}
+
+.stub__text {
+  max-width: 280px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--label-2);
+  letter-spacing: -0.2px;
+}
+
+/* Срок — отдельной плашкой: это не часть описания, а отметка о статусе */
+.stub__eta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--color-fill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.stub__eta .icon { width: 14px; height: 14px; }
+
+.stub__hint {
+  margin-top: 4px;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--label-3);
+}

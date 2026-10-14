@@ -26,6 +26,7 @@
   var CACHE_KEY = 'tiu-go-cache';
   var NOTIF_KEY = 'tiu-go-notifications';
   var HAPTICS_KEY = 'tiu-go-haptics';
+  var TAB_KEY = 'tiu-go-tab';
 
   var THEME_BG = { dark: '#0B0D12', light: '#F7F8FA' };
 
@@ -143,6 +144,13 @@
     themeColor: $('theme-color'),
     home: $('screen-home'),
     detail: $('screen-detail'),
+
+    // Вкладки и экран «Новости»
+    news: $('screen-news'),
+    newsChannelButton: $('news-channel-button'),
+    tabbar: $('tabbar'),
+    tabElevators: $('tab-elevators'),
+    tabNews: $('tab-news'),
     summary: $('summary'),
     skeleton: $('skeleton'),
     grid: $('grid'),
@@ -1991,6 +1999,7 @@
     el.aboutChannel.hidden = !has;
     el.channelBanner.hidden = !has;
     el.channelFoot.hidden = !has;
+    el.newsChannelButton.hidden = !has;
   }
 
   function openChannel() {
@@ -2036,13 +2045,13 @@
    */
   function buildShareText(lift) {
     var lines = [
-      '🛗 ' + t('share.head'),
+      t('share.head'),
       elevatorName(lift) + ' · ' + state.address
     ];
 
     if (isDown(lift)) {
       lines.push('');
-      lines.push('⚠ ' + t('share.broken'));
+      lines.push(t('share.broken'));
       if (lift.statusNote) lines.push(lift.statusNote);
     } else {
       lines.push('');
@@ -2280,7 +2289,9 @@
   /** Показывает экран лифта до прихода данных — по ссылке. */
   function showDetailPlaceholder(number) {
     el.home.hidden = true;
+    el.news.hidden = true;
     el.detail.hidden = false;
+    syncTabbar();
     setDetailLoading(true);
     setText(el.detailTitle, t('tile.elevatorName', { n: number }));
     setText(el.detailSubtitle, '—');
@@ -2308,6 +2319,95 @@
     showDetail(lift.id);
   }
 
+  // ---------- Вкладки ----------
+  //
+  // Разделов верхнего уровня два: лифты и новости. Экраны лифта и
+  // «О проекте» — вложенные: они открываются поверх раздела, и панель
+  // вкладок на них прячется. Так нижняя панель не спорит с тулбаром
+  // экрана лифта и не предлагает уйти в другой раздел оттуда, откуда
+  // сначала нужно вернуться.
+
+  var currentTab = 'elevators';
+
+  function readTab() {
+    try {
+      return window.localStorage.getItem(TAB_KEY) === 'news' ? 'news' : 'elevators';
+    } catch (e) {
+      return 'elevators';
+    }
+  }
+
+  function saveTab(name) {
+    try { window.localStorage.setItem(TAB_KEY, name); } catch (e) {}
+  }
+
+  /** Корневой экран текущего раздела. */
+  function tabScreen() {
+    return currentTab === 'news' ? el.news : el.home;
+  }
+
+  /**
+   * Состояние панели: какая вкладка подсвечена и видна ли она вообще.
+   * Класс на body нужен тосту — он поднимается над панелью, пока она есть.
+   */
+  function syncTabbar() {
+    // Смотрим на сами экраны, а не на state.openId: по ссылке вида
+    // #lift-3 экран лифта показывается заглушкой ещё до прихода данных,
+    // и openId в этот момент пустой, а панель уже должна быть скрыта.
+    var nested = !el.detail.hidden || !el.about.hidden;
+
+    el.tabbar.hidden = nested;
+    document.body.classList.toggle('has-tabbar', !nested);
+
+    [[el.tabElevators, 'elevators'], [el.tabNews, 'news']].forEach(function (pair) {
+      var active = pair[1] === currentTab;
+      pair[0].classList.toggle('is-active', active);
+      if (active) pair[0].setAttribute('aria-current', 'page');
+      else pair[0].removeAttribute('aria-current');
+    });
+  }
+
+  /** Показать корневой экран текущего раздела. */
+  function showTabScreen(animation) {
+    var news = currentTab === 'news';
+
+    el.home.hidden = news;
+    el.news.hidden = !news;
+
+    window.scrollTo(0, 0);
+    toggleHostBackButton(false);
+
+    if (!news) renderHome();
+    if (animation) animateScreen(tabScreen(), animation);
+
+    syncTabbar();
+    onScroll();
+  }
+
+  /**
+   * Переключение раздела.
+   *
+   * Если поверх открыт вложенный экран, сначала закрываем его: вкладку
+   * запоминаем до закрытия, поэтому вернувшийся showHome() покажет уже
+   * новый раздел, а не старый.
+   */
+  function switchTab(name) {
+    if (name !== 'elevators' && name !== 'news') return;
+
+    var nested = !el.detail.hidden || !el.about.hidden;
+    if (name === currentTab && !nested) return;
+
+    haptic();
+    currentTab = name;
+    saveTab(name);
+
+    if (state.openId !== null) { closeDetail(); return; }
+    if (!el.about.hidden) { closeAbout(); return; }
+
+    // Направление анимации по порядку вкладок: вправо — вперёд, влево — назад
+    showTabScreen(name === 'news' ? 'screen--push' : 'screen--pop');
+  }
+
   function showDetail(id) {
     state.openId = id;
 
@@ -2315,9 +2415,11 @@
     [el.dOccupancy, el.dFloor, el.dWait].forEach(resetNumber);
 
     el.home.hidden = true;
+    el.news.hidden = true;
     el.detail.hidden = false;
     window.scrollTo(0, 0);
     toggleHostBackButton(true);
+    syncTabbar();
     renderDetail();
     revealDestination();
     animateScreen(el.detail, 'screen--push');
@@ -2341,12 +2443,9 @@
 
     el.detail.hidden = true;
     el.about.hidden = true;
-    el.home.hidden = false;
-    window.scrollTo(0, 0);
-    toggleHostBackButton(false);
-    renderHome();
-    animateScreen(el.home, 'screen--pop');
-    onScroll();
+
+    // «Домой» — это корень текущего раздела, а не обязательно список лифтов
+    showTabScreen('screen--pop');
   }
 
   // ---------- Компактный навбар списка ----------
@@ -2356,7 +2455,9 @@
   var titleEdge = 60;
 
   function measureTitle() {
-    var title = document.querySelector('.hero__title');
+    // Заголовков на странице теперь два — на главном и на «Новостях».
+    // Навбар есть только у главного, его заголовок и меряем.
+    var title = el.home.querySelector('.hero__title');
     if (title) {
       titleEdge = Math.max(title.offsetTop + title.offsetHeight - 46, 24);
     }
@@ -2412,10 +2513,12 @@
     renderAbout();
 
     el.home.hidden = true;
+    el.news.hidden = true;
     el.detail.hidden = true;
     el.about.hidden = false;
     window.scrollTo(0, 0);
     toggleHostBackButton(true);
+    syncTabbar();
     animateScreen(el.about, 'screen--push');
 
     // Своя запись в истории: системная стрелка «назад» в Telegram и MAX
@@ -2738,6 +2841,13 @@
 
   el.shareCancel.addEventListener('click', closeSheet);
 
+  // ── Вкладки ──
+  el.tabElevators.addEventListener('click', function () { switchTab('elevators'); });
+  el.tabNews.addEventListener('click', function () { switchTab('news'); });
+
+  // Кнопка канала на экране новостей — та же ссылка, что и везде
+  el.newsChannelButton.addEventListener('click', openChannel);
+
   // Открытие лифта по ссылке в уже запущенном приложении
   window.addEventListener('hashchange', function () {
     var number = readLiftHash();
@@ -2757,12 +2867,14 @@
     destination = readDestination();
     notifications = readNotifications();
     haptics = readHaptics();
+    currentTab = readTab();
 
     // Ссылка вида index.html#lift-3 открывает сразу нужный лифт.
     // Экран показываем немедленно — с заглушками, чтобы человек видел,
     // что приложение откликнулось, а не ждал белого экрана.
     pendingOpenId = readLiftHash();
     if (pendingOpenId !== null) showDetailPlaceholder(pendingOpenId);
+    else showTabScreen(null); // поднимаем раздел, в котором человек был в прошлый раз
 
     initHost();
     renderNotifButton();

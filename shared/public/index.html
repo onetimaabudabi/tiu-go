@@ -353,6 +353,23 @@
     <path d="M20.6 13.6c-1.6-.9-3.6-.3-4.4 1.2l-.8 1.5"/>
   </symbol>
 
+  <!-- ── Вкладки и заглушки ────────────────────────────────
+       Газета для вкладки «Новости» и скрещённые инструменты
+       для блока «функция в разработке». -->
+  <symbol id="icon-news" viewBox="0 0 24 24">
+    <path d="M17.5 20.5H5.5a2 2 0 0 1-2-2v-13h14v13a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9h-4"/>
+    <path d="M6.8 9h7.4"/>
+    <path d="M6.8 12.4h7.4"/>
+    <path d="M6.8 15.8h4.6"/>
+  </symbol>
+
+  <symbol id="icon-construction" viewBox="0 0 24 24">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.1-3.1a5.5 5.5 0 0 1-7.3 7.3l-6.4 6.4a1.95 1.95 0 0 1-2.75-2.75l6.4-6.4a5.5 5.5 0 0 1 7.3-7.3z"/>
+    <path d="M3.6 6.9 6.9 3.6a1.6 1.6 0 0 1 2.2 0l1.8 1.8a1.6 1.6 0 0 1 0 2.2L7.6 10.9z"/>
+    <path d="M9.6 11.4 16.9 18.7"/>
+    <path d="m16.1 19.5 1.8-1.8 2.3 2.3a1.3 1.3 0 0 1-1.8 1.8z"/>
+  </symbol>
+
   <symbol id="icon-external-link" viewBox="0 0 24 24">
     <path d="M14 4h6v6"/>
     <path d="M20 4 11.5 12.5"/>
@@ -368,7 +385,7 @@
   </div>
 
   <!-- ══ Главный экран ══════════════════════════════════ -->
-  <section class="screen" id="screen-home">
+  <section class="screen screen--tabbed" id="screen-home">
 
     <!-- Компактный навбар: проявляется при прокрутке, карточки идут под ним -->
     <div class="topbar glass" id="topbar" aria-hidden="true">
@@ -805,6 +822,79 @@
 
     </div>
   </section>
+
+  <!--
+    ══ Экран «Новости» ════════════════════════════════
+
+    Пока заглушка: интеграции с новостными каналами ТИУ ещё нет,
+    и показывать здесь нечего. Вместо пустого экрана — честный блок
+    «в разработке» и ссылка на канал, где новости уже есть.
+    Когда появится источник, место под список новостей — внутри
+    .content, вместо .stub.
+  -->
+  <section class="screen screen--tabbed" id="screen-news" hidden>
+
+    <header class="hero">
+      <span class="hero__brand">TIU GO</span>
+      <div class="hero__row">
+        <h1 class="hero__title" data-i18n="news.title">Новости ТИУ</h1>
+      </div>
+      <p class="hero__sub" data-i18n="news.subtitle">
+        Скоро здесь появятся новости университета
+      </p>
+    </header>
+
+    <div class="content">
+      <section class="stub">
+        <span class="stub__badge" aria-hidden="true">
+          <svg class="icon" aria-hidden="true"><use href="#icon-construction"></use></svg>
+        </span>
+
+        <h2 class="stub__title" data-i18n="news.inDevelopment">Функция в разработке</h2>
+
+        <p class="stub__text" data-i18n="news.description">
+          Мы работаем над интеграцией с новостными каналами ТИУ.
+          Здесь появятся свежие новости университета — прямо в приложении.
+        </p>
+
+        <span class="stub__eta">
+          <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+          <span data-i18n="news.eta">Ожидаемое время: скоро</span>
+        </span>
+
+        <p class="stub__hint" data-i18n="news.followChannel">
+          Следите за обновлениями в нашем Telegram-канале
+        </p>
+
+        <button class="button button--telegram" id="news-channel-button" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-telegram"></use></svg>
+          <span data-i18n="channel.subscribe">Подписаться на канал</span>
+        </button>
+      </section>
+    </div>
+  </section>
+
+  <!--
+    ══ Нижний таб-бар ═════════════════════════════════
+
+    Две вкладки верхнего уровня. На экране лифта и «О проекте»
+    скрывается: это вложенные экраны со своей навигацией, и нижняя
+    панель там только мешала бы — на экране лифта внизу уже стоит
+    свой тулбар с кнопкой.
+  -->
+  <nav class="tabbar" id="tabbar" aria-label="Разделы">
+    <button class="tabbar__item is-active" id="tab-elevators" type="button"
+            data-tab="elevators" aria-current="page">
+      <svg class="icon icon--tab" aria-hidden="true"><use href="#icon-elevator"></use></svg>
+      <span data-i18n="tab.elevators">Лифты</span>
+    </button>
+
+    <button class="tabbar__item" id="tab-news" type="button" data-tab="news">
+      <svg class="icon icon--tab" aria-hidden="true"><use href="#icon-news"></use></svg>
+      <span data-i18n="tab.news">Новости</span>
+    </button>
+  </nav>
+
 
   <!-- ══ Модалка «сообщить о проблеме» ══════════════════ -->
   <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
