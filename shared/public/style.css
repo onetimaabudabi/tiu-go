@@ -22,6 +22,10 @@
 
   /* Производные от палитры */
   --color-fill: rgba(255, 255, 255, 0.07);
+
+  /* Подложка активной вкладки в панели. Отдельно от --color-fill:
+     на стекле та почти не читается, а трогать общий токен нельзя. */
+  --tab-active: rgba(255, 255, 255, 0.12);
   --tint-ok: rgba(34, 197, 94, 0.14);
   --tint-busy: rgba(245, 158, 11, 0.14);
   --tint-full: rgba(239, 68, 68, 0.12);
@@ -83,6 +87,7 @@
   --color-full: #EF4444;
 
   --color-fill: rgba(11, 13, 18, 0.05);
+  --tab-active: rgba(11, 13, 18, 0.07);
   --tint-ok: rgba(34, 197, 94, 0.12);
   --tint-busy: rgba(245, 158, 11, 0.14);
   --tint-full: rgba(239, 68, 68, 0.08);
@@ -2323,32 +2328,33 @@ select.field__input {
  */
 
 :root {
-  --tabbar-h: 60px;
+  --tabbar-h: 58px;      /* высота самой пилюли */
+  --tabbar-gap: 10px;    /* насколько она приподнята над краем экрана */
 }
 
+/*
+ * Панель — не полоса во всю ширину, а плавающая пилюля: по бокам и снизу
+ * остаются поля, под ней лежит тень, а содержимое проезжает насквозь и
+ * видно через размытие. Фон и размытие даёт .glass из разметки, своего
+ * background здесь быть не должно — правило ниже по файлу и перебило бы его.
+ */
 .tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--tabbar-gap) + env(safe-area-inset-bottom));
   z-index: 30;
 
   display: flex;
-  max-width: 600px;          /* как у .screen: на планшете панель не растягивается */
+  gap: 4px;
+  max-width: 420px;      /* на планшете пилюля не растягивается во всю ширину */
   margin: 0 auto;
-  border-top: 0.5px solid var(--color-line);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 5px;
+  border-radius: 999px;
 
-  /*
-   * Фон и размытие берём у .glass в разметке. Своего background здесь
-   * быть не должно: это правило лежит ниже по файлу и при одинаковой
-   * специфичности перебило бы подложку стекла.
-   *
-   * Контент проезжает под панелью по-настоящему: нижний отступ
-   * .screen--tabbed равен её высоте, поэтому в конце прокрутки подвал
-   * встаёт над панелью, а по дороге карточки уходят под неё и видны
-   * сквозь размытие.
-   */
+  /* Тень отрывает пилюлю от фона, тонкое кольцо внутри держит край
+     там, где тень почти не видна, — как у тоста. */
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.26), inset 0 0 0 0.5px var(--color-line);
 }
 
 /* На вложенных экранах панели нет: там своя навигация */
@@ -2360,10 +2366,11 @@ select.field__input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  height: var(--tabbar-h);
+  gap: 3px;
+  height: calc(var(--tabbar-h) - 10px);
   padding: 0 4px;
   border: 0;
+  border-radius: 999px;
   background: none;
   color: var(--label-2);
   font-size: 11px;
@@ -2372,22 +2379,31 @@ select.field__input {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: color 0.2s ease, transform 0.2s var(--ease);
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s var(--ease);
 }
 
 .tabbar__item:active { transform: scale(0.94); }
 
-.tabbar__item.is-active { color: var(--color-accent); }
+/* Активная вкладка сидит в своей капсуле — так видно, где ты, даже
+   когда под панелью проезжает пёстрый контент и один цвет теряется. */
+.tabbar__item.is-active {
+  color: var(--color-accent);
+  background: var(--tab-active);
+}
 
 /* Иконка в панели крупнее текстовой: подпись под ней совсем мелкая */
 .icon--tab { width: 22px; height: 22px; }
 
-/* Контент не должен уезжать под панель */
-.screen--tabbed { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
+/* Контент не должен уезжать под панель насовсем: нижнего отступа хватает,
+   чтобы в конце прокрутки подвал встал над ней, а по дороге карточки
+   проезжали под пилюлей и были видны сквозь размытие. */
+.screen--tabbed {
+  padding-bottom: calc(var(--tabbar-h) + var(--tabbar-gap) * 2 + env(safe-area-inset-bottom));
+}
 
 /* Тост поднимается над панелью, пока она на экране */
 body.has-tabbar .toast {
-  bottom: calc(28px + var(--tabbar-h) + env(safe-area-inset-bottom));
+  bottom: calc(var(--tabbar-h) + var(--tabbar-gap) * 2 + 10px + env(safe-area-inset-bottom));
 }
 
 /* ── Экран «Новости»: блок-заглушка ─────────────────────── */
