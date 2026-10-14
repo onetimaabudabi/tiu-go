@@ -122,6 +122,11 @@ html, body {
   max-width: 100%;
   min-height: 100%;
   background: var(--color-bg);
+
+  /* Горизонтальной прокрутки нет ни при каком языке.
+     Именно clip, а не hidden: hidden сделал бы html скролл-контейнером
+     и сломал бы position: sticky у навбара, а clip просто обрезает. */
+  overflow-x: clip;
 }
 
 body {
@@ -272,7 +277,13 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+
+  /* Кнопки уходят на свою строку, если заголовок с ними не помещается.
+     Английское «Elevators» заметно шире русских «Лифтов», и без переноса
+     последняя кнопка уезжала за край экрана, а вместе с ней ездила
+     и вся страница. Перенос работает в любом языке и на любой ширине. */
+  flex-wrap: wrap;
+  gap: 8px 10px;
 }
 
 .hero__title {
@@ -285,8 +296,10 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 .hero__tools {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 0 0 auto;
+  /* И в одну строку с заголовком, и перенесённые — всегда прижаты вправо */
+  margin-left: auto;
 }
 
 .hero__sub {
@@ -350,9 +363,9 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
 .chipbtn {
   display: grid;
   place-items: center;
-  min-width: 36px;
+  min-width: 34px;
   height: 32px;
-  padding: 0 9px;
+  padding: 0 7px;
   border: 1px solid var(--color-line);
   border-radius: 999px;
   background: var(--color-card);
@@ -1288,9 +1301,14 @@ body.is-offline .topbar { top: var(--offline-h, 0px); }
   }
 }
 
+/* Телефоны: заголовок мельче, чтобы ряд кнопок оставался с ним на одной
+   строке. Там, где всё равно не помещается, сработает перенос. */
+@media (max-width: 400px) {
+  .hero__title { font-size: 30px; }
+}
+
 /* Узкие экраны */
 @media (max-width: 340px) {
-  .hero__title { font-size: 30px; }
   .tile__floor-num b { font-size: 34px; }
   .metric__value { font-size: 30px; }
   .shaft { height: 52px; }
@@ -2161,12 +2179,18 @@ select.field__input {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Боковые отступы — как у сетки карточек: плашка стоит в том же
-     поле набора, а не распирает экран от края до края. */
-  margin: 18px 16px 0;
-  padding: 12px 14px;
+  /* Во всю ширину экрана: кнопка по умолчанию сжимается по содержимому,
+     поэтому ширину задаём явно, а поля убираем. Боковых границ и
+     скругления у полосы во весь экран быть не должно — остаются только
+     верхняя и нижняя линии. Внутренний отступ 16px держит текст в том же
+     поле набора, что и карточки. */
+  width: 100%;
+  margin: 18px 0 0;
+  padding: 12px 16px;
   border: 1px solid var(--tg-line);
-  border-radius: 14px;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
   background: linear-gradient(135deg, var(--tg-tint), rgba(28, 142, 194, 0.08));
   color: var(--label);
   text-align: left;
@@ -2174,10 +2198,12 @@ select.field__input {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: transform 0.15s ease, border-color var(--theme-shift);
+  transition: opacity 0.15s ease, border-color var(--theme-shift);
 }
 
-.channel:active { transform: scale(0.98); }
+/* Сжимать полосу во весь экран нельзя — по краям вылезал бы фон.
+   Отклик на нажатие даём прозрачностью. */
+.channel:active { opacity: 0.75; }
 
 .channel__mark {
   display: flex;

@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "3d:dev"],
       "port": 5173
+    },
+    {
+      "name": "tiu-go",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:server"],
+      "port": 3000
     }
   ]
 }
