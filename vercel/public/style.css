@@ -172,7 +172,7 @@ button { font: inherit; color: inherit; }
 
 /* Там, где размытие не поддерживается, панели просто становятся плотными */
 @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-  .topbar, .navbar, .toolbar { background: var(--color-bg); }
+  .topbar, .navbar, .toolbar, .tabbar { background: var(--color-bg); }
   .glass--over-media { background: var(--color-bg); }
 }
 
@@ -2336,10 +2336,19 @@ select.field__input {
   display: flex;
   max-width: 600px;          /* как у .screen: на планшете панель не растягивается */
   margin: 0 auto;
-  border-top: 1px solid var(--color-line);
-  background: var(--color-card);
+  border-top: 0.5px solid var(--color-line);
   padding-bottom: env(safe-area-inset-bottom);
-  transition: background-color var(--theme-shift), border-color var(--theme-shift);
+
+  /*
+   * Фон и размытие берём у .glass в разметке. Своего background здесь
+   * быть не должно: это правило лежит ниже по файлу и при одинаковой
+   * специфичности перебило бы подложку стекла.
+   *
+   * Контент проезжает под панелью по-настоящему: нижний отступ
+   * .screen--tabbed равен её высоте, поэтому в конце прокрутки подвал
+   * встаёт над панелью, а по дороге карточки уходят под неё и видны
+   * сквозь размытие.
+   */
 }
 
 /* На вложенных экранах панели нет: там своя навигация */
