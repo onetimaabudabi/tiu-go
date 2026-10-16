@@ -2471,3 +2471,121 @@ body.has-tabbar .toast {
   line-height: 1.35;
   color: var(--label-3);
 }
+
+/* ==========================================================================
+   Отсчёт до пары, совет дня и калории
+   ========================================================================== */
+
+/* ── Отсчёт до начала следующей пары ────────────────────── */
+.countdown {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  margin: 12px 0 0;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-card);
+  color: var(--label);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: opacity 0.15s ease, background-color var(--theme-shift),
+              color var(--theme-shift);
+}
+
+.countdown:active { opacity: 0.75; }
+
+.countdown__clock { flex: 0 0 auto; width: 18px; height: 18px; color: var(--label-3); }
+
+.countdown__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.countdown__go { flex: 0 0 auto; width: 16px; height: 16px; color: var(--label-3); }
+
+/*
+ * Меньше пятнадцати минут до пары — плашка желтеет. Цвет берём из тех же
+ * переменных, что и остальные предупреждения в приложении, чтобы в обеих
+ * темах он совпадал с плашкой «работают 3 из 6».
+ */
+.countdown.is-soon {
+  background: var(--peak-bg);
+  color: var(--peak-fg);
+}
+
+.countdown.is-soon .countdown__clock,
+.countdown.is-soon .countdown__go { color: var(--peak-fg); }
+
+/* Пары кончились — спокойная зелёная отметка, без оттенка тревоги */
+.countdown.is-over .countdown__clock { color: var(--color-ok); }
+.countdown.is-over .countdown__text { color: var(--label-2); font-weight: 500; }
+
+/* ── Совет дня ──────────────────────────────────────────── */
+.tip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 16px 0;
+  padding: 14px;
+  border-radius: var(--r-inner);
+  background: var(--color-card);
+  box-shadow: var(--card-shadow);
+}
+
+.tip__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--label-3);
+  text-transform: uppercase;
+}
+
+.tip__badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tint-accent);
+  color: var(--color-accent);
+}
+
+.tip__badge .icon { width: 15px; height: 15px; }
+
+.tip__text {
+  font-size: 15.5px;
+  line-height: 1.38;
+  color: var(--label);
+  letter-spacing: -0.2px;
+}
+
+/* ── Калории на экране лифта ────────────────────────────── */
+.compare__kcal {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--color-line);
+  font-size: 13px;
+  color: var(--label-3);
+  transition: color var(--theme-shift);
+}
+
+.compare__kcal .icon { flex: 0 0 auto; width: 15px; height: 15px; }
+
+/* От десятого этажа подъём уже тянет на тренировку — показываем акцентом */
+.compare__kcal.is-workout { color: var(--color-accent); font-weight: 600; }

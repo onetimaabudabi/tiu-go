@@ -145,12 +145,24 @@
     home: $('screen-home'),
     detail: $('screen-detail'),
 
-    // Вкладки и экран «Новости»
+    // Вкладки и экраны-заглушки
     news: $('screen-news'),
     newsChannelButton: $('news-channel-button'),
+    schedule: $('screen-schedule'),
+    scheduleChannelButton: $('schedule-channel-button'),
     tabbar: $('tabbar'),
     tabElevators: $('tab-elevators'),
+    tabSchedule: $('tab-schedule'),
     tabNews: $('tab-news'),
+
+    // Отсчёт до пары и совет дня
+    countdown: $('countdown'),
+    countdownText: $('countdown-text'),
+    tipText: $('tip-text'),
+
+    // Калории на экране лифта
+    cmpKcal: $('cmp-kcal'),
+    cmpKcalText: $('cmp-kcal-text'),
     summary: $('summary'),
     skeleton: $('skeleton'),
     grid: $('grid'),
@@ -265,6 +277,8 @@
 
     el.reportComment.setAttribute('placeholder', t('report.commentPlaceholder'));
 
+    renderCountdown();
+    renderTip(true);   // фраза та же, но на другом языке
     buildReportReasons();
     buildDestination();
     buildNotifTypes();
@@ -1380,6 +1394,8 @@
     setText(el.cmpVerdict, verdict);
     el.cmpVerdict.classList.toggle('is-stairs', lift.fasterOption === 'stairs');
     el.cmpVerdict.classList.toggle('is-elevator', lift.fasterOption === 'elevator');
+
+    renderCalories();
   }
 
   /**
@@ -2000,6 +2016,7 @@
     el.channelBanner.hidden = !has;
     el.channelFoot.hidden = !has;
     el.newsChannelButton.hidden = !has;
+    el.scheduleChannelButton.hidden = !has;
   }
 
   function openChannel() {
@@ -2288,8 +2305,7 @@
 
   /** Показывает экран лифта до прихода данных — по ссылке. */
   function showDetailPlaceholder(number) {
-    el.home.hidden = true;
-    el.news.hidden = true;
+    hideTabScreens();
     el.detail.hidden = false;
     syncTabbar();
     setDetailLoading(true);
@@ -2319,19 +2335,185 @@
     showDetail(lift.id);
   }
 
+  // ---------- Отсчёт до пары и совет дня ----------
+  //
+  // Времена пар и фразы лежат в shared/public/schedule.js: часам не нужна
+  // сеть, и плашка показывает верное время с первой же отрисовки, ещё до
+  // ответа /api/status. Согласованность расписания с shared/params.json
+  // проверяет npm run check:params.
+
+  var SCHEDULE = window.TIU_SCHEDULE || null;
+
+  // Меньше этого числа минут до пары — плашка желтеет
+  var SOON_MINUTES = 15;
+
+  var clockTimer = null;
+  var tipDay = null;   // номер дня, для которого сейчас показана фраза
+
+  /** «1 ч 15 мин» или «15 мин» — в зависимости от того, есть ли часы. */
+  function formatLeft(minutes) {
+    var hours = Math.floor(minutes / 60);
+    var rest = minutes % 60;
+
+    // «2 ч 0 мин» звучит коряво — ровные часы показываем без минут
+    if (hours > 0 && rest === 0) return t('class.hoursOnly', { h: hours });
+    if (hours > 0) return t('class.hours', { h: hours, m: rest });
+    return t('class.minutes', { m: rest });
+  }
+
+  /**
+   * Плашка отсчёта. Три состояния: пара идёт, до пары столько-то,
+   * на сегодня всё. Текст пересобирается каждую секунду, но setText
+   * пишет в DOM только когда строка действительно изменилась.
+   */
+  function renderCountdown() {
+    if (!SCHEDULE) {
+      el.countdown.hidden = true;
+      return;
+    }
+
+    var info = SCHEDULE.pairState(new Date());
+    var text;
+    var soon = false;
+    var over = false;
+
+    if (info.kind === 'now') {
+      text = t('class.now', { n: info.pair });
+    } else if (info.kind === 'before') {
+      soon = info.minutes <= SOON_MINUTES;
+      text = soon
+        ? t('class.timeToGo') + ' ' + t('class.until', {
+            n: info.pair, time: formatLeft(info.minutes)
+          })
+        : t('class.until', { n: info.pair, time: formatLeft(info.minutes) });
+    } else {
+      over = true;
+      text = t('class.dayOver');
+    }
+
+    setText(el.countdownText, text);
+    el.countdown.classList.toggle('is-soon', soon);
+    el.countdown.classList.toggle('is-over', over);
+    el.countdown.hidden = false;
+  }
+
+  /**
+   * Фраза дня. Выбор детерминированный — по номеру дня в году, поэтому
+   * у всех она одна и та же, а в полночь меняется сама.
+   */
+  function renderTip(force) {
+    if (!SCHEDULE) return;
+
+    var day = SCHEDULE.dayIndex(new Date());
+    if (!force && day === tipDay) return;
+
+    tipDay = day;
+    setText(el.tipText, SCHEDULE.tipFor(lang));
+  }
+
+  /**
+   * Секундные часы. Молчим в скрытом окне: считать время в свёрнутом
+   * приложении незачем, а при возврате всё пересчитается сразу.
+   */
+  function startClock() {
+    clearInterval(clockTimer);
+
+    var tick = function () {
+      if (document.hidden) return;
+      renderCountdown();
+      renderTip(false);   // сменился день — поменяется и фраза
+    };
+
+    tick();
+    clockTimer = setInterval(tick, 1000);
+  }
+
+  // Вернулись в приложение — показываем актуальное время, не дожидаясь тика
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      renderCountdown();
+      renderTip(false);
+    }
+  });
+
+  // ---------- Калории на лестнице ----------
+  //
+  // 0,15 ккал на этаж — оценка для человека 70 кг; коэффициент оставлен
+  // на будущее, когда в настройках появится вес. Этаж берётся тот же,
+  // что и для сравнения с лестницей, — выбранный этаж назначения.
+
+  var KCAL_PER_FLOOR = 0.15;
+  var BASE_WEIGHT_KG = 70;
+  var userWeightKg = BASE_WEIGHT_KG;
+
+  /** Число с одним знаком после запятой по правилам языка. */
+  function formatKcal(value) {
+    try {
+      return value.toLocaleString(lang, {
+        minimumFractionDigits: 1, maximumFractionDigits: 1
+      });
+    } catch (e) {
+      return value.toFixed(1);
+    }
+  }
+
+  function renderCalories() {
+    var floor = destination || 1;
+
+    // На первом этаже подниматься некуда — и считать нечего
+    if (floor <= 1) {
+      setText(el.cmpKcalText, t('calories.firstFloor'));
+      el.cmpKcal.classList.remove('is-workout');
+      el.cmpKcal.hidden = false;
+      return;
+    }
+
+    var kcal = KCAL_PER_FLOOR * floor * (userWeightKg / BASE_WEIGHT_KG);
+    var text = t('calories.burned', { kcal: formatKcal(kcal) });
+
+    // До третьего этажа это прогулка, с десятого — уже тренировка
+    if (floor >= 10) text += ' — ' + t('calories.workout');
+    else if (floor <= 3) text += ' — ' + t('calories.walk');
+
+    setText(el.cmpKcalText, text);
+    el.cmpKcal.classList.toggle('is-workout', floor >= 10);
+    el.cmpKcal.hidden = false;
+  }
+
   // ---------- Вкладки ----------
   //
-  // Разделов верхнего уровня два: лифты и новости. Экраны лифта и
-  // «О проекте» — вложенные: они открываются поверх раздела, и панель
-  // вкладок на них прячется. Так нижняя панель не спорит с тулбаром
-  // экрана лифта и не предлагает уйти в другой раздел оттуда, откуда
-  // сначала нужно вернуться.
+  // Разделов верхнего уровня три: лифты, расписание и новости. Экраны
+  // лифта и «О проекте» — вложенные: они открываются поверх раздела, и
+  // панель вкладок на них прячется. Так нижняя панель не спорит с
+  // тулбаром экрана лифта и не предлагает уйти в другой раздел оттуда,
+  // откуда сначала нужно вернуться.
+  //
+  // Порядок в массиве — это и порядок кнопок, и направление анимации:
+  // вправо по списку уезжает «вперёд», влево — «назад».
+
+  var TABS = [
+    { name: 'elevators', screen: 'home',     button: 'tabElevators' },
+    { name: 'schedule',  screen: 'schedule', button: 'tabSchedule' },
+    { name: 'news',      screen: 'news',     button: 'tabNews' }
+  ];
 
   var currentTab = 'elevators';
 
+  function tabIndex(name) {
+    for (var i = 0; i < TABS.length; i += 1) {
+      if (TABS[i].name === name) return i;
+    }
+    return 0;
+  }
+
+  function isTab(name) {
+    return TABS.some(function (tab) { return tab.name === name; });
+  }
+
   function readTab() {
     try {
-      return window.localStorage.getItem(TAB_KEY) === 'news' ? 'news' : 'elevators';
+      var saved = window.localStorage.getItem(TAB_KEY);
+      return isTab(saved) ? saved : 'elevators';
     } catch (e) {
       return 'elevators';
     }
@@ -2343,7 +2525,17 @@
 
   /** Корневой экран текущего раздела. */
   function tabScreen() {
-    return currentTab === 'news' ? el.news : el.home;
+    return el[TABS[tabIndex(currentTab)].screen];
+  }
+
+  /** Поверх вкладок открывается вложенный экран? */
+  function nestedOpen() {
+    return !el.detail.hidden || !el.about.hidden;
+  }
+
+  /** Спрятать все корневые экраны разом — перед показом вложенного. */
+  function hideTabScreens() {
+    TABS.forEach(function (tab) { el[tab.screen].hidden = true; });
   }
 
   /**
@@ -2354,30 +2546,29 @@
     // Смотрим на сами экраны, а не на state.openId: по ссылке вида
     // #lift-3 экран лифта показывается заглушкой ещё до прихода данных,
     // и openId в этот момент пустой, а панель уже должна быть скрыта.
-    var nested = !el.detail.hidden || !el.about.hidden;
+    var nested = nestedOpen();
 
     el.tabbar.hidden = nested;
     document.body.classList.toggle('has-tabbar', !nested);
 
-    [[el.tabElevators, 'elevators'], [el.tabNews, 'news']].forEach(function (pair) {
-      var active = pair[1] === currentTab;
-      pair[0].classList.toggle('is-active', active);
-      if (active) pair[0].setAttribute('aria-current', 'page');
-      else pair[0].removeAttribute('aria-current');
+    TABS.forEach(function (tab) {
+      var button = el[tab.button];
+      var active = tab.name === currentTab;
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
     });
   }
 
   /** Показать корневой экран текущего раздела. */
   function showTabScreen(animation) {
-    var news = currentTab === 'news';
-
-    el.home.hidden = news;
-    el.news.hidden = !news;
+    hideTabScreens();
+    tabScreen().hidden = false;
 
     window.scrollTo(0, 0);
     toggleHostBackButton(false);
 
-    if (!news) renderHome();
+    if (currentTab === 'elevators') renderHome();
     if (animation) animateScreen(tabScreen(), animation);
 
     syncTabbar();
@@ -2392,10 +2583,12 @@
    * новый раздел, а не старый.
    */
   function switchTab(name) {
-    if (name !== 'elevators' && name !== 'news') return;
+    if (!isTab(name)) return;
 
-    var nested = !el.detail.hidden || !el.about.hidden;
+    var nested = nestedOpen();
     if (name === currentTab && !nested) return;
+
+    var forward = tabIndex(name) > tabIndex(currentTab);
 
     haptic();
     currentTab = name;
@@ -2404,8 +2597,7 @@
     if (state.openId !== null) { closeDetail(); return; }
     if (!el.about.hidden) { closeAbout(); return; }
 
-    // Направление анимации по порядку вкладок: вправо — вперёд, влево — назад
-    showTabScreen(name === 'news' ? 'screen--push' : 'screen--pop');
+    showTabScreen(forward ? 'screen--push' : 'screen--pop');
   }
 
   function showDetail(id) {
@@ -2414,8 +2606,7 @@
     // На экране детали цифры начинают отсчёт заново, без анимации от чужих значений
     [el.dOccupancy, el.dFloor, el.dWait].forEach(resetNumber);
 
-    el.home.hidden = true;
-    el.news.hidden = true;
+    hideTabScreens();
     el.detail.hidden = false;
     window.scrollTo(0, 0);
     toggleHostBackButton(true);
@@ -2512,8 +2703,7 @@
     closeSheet();
     renderAbout();
 
-    el.home.hidden = true;
-    el.news.hidden = true;
+    hideTabScreens();
     el.detail.hidden = true;
     el.about.hidden = false;
     window.scrollTo(0, 0);
@@ -2843,10 +3033,15 @@
 
   // ── Вкладки ──
   el.tabElevators.addEventListener('click', function () { switchTab('elevators'); });
+  el.tabSchedule.addEventListener('click', function () { switchTab('schedule'); });
   el.tabNews.addEventListener('click', function () { switchTab('news'); });
 
-  // Кнопка канала на экране новостей — та же ссылка, что и везде
+  // Кнопка канала на экранах-заглушках — та же ссылка, что и везде
   el.newsChannelButton.addEventListener('click', openChannel);
+  el.scheduleChannelButton.addEventListener('click', openChannel);
+
+  // Плашка отсчёта ведёт туда, где со временем будет само расписание
+  el.countdown.addEventListener('click', function () { switchTab('schedule'); });
 
   // Открытие лифта по ссылке в уже запущенном приложении
   window.addEventListener('hashchange', function () {
@@ -2882,6 +3077,11 @@
 
     measureTitle();
     onScroll();
+
+    // Часам сеть не нужна — пускаем их до первого ответа сервера
+    renderTip(true);
+    startClock();
+
     load();
     startPolling();
   }

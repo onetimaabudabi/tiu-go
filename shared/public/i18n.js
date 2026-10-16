@@ -228,16 +228,38 @@
       'channel.about': 'Присоединяйся к нашему каналу в Telegram — там мы публикуем обновления приложения, анонсы бета-версий и результаты опросов.',
       'channel.footer': 'Мы в Telegram: @tiu_go',
 
+      // ---------- Отсчёт до пары, совет дня, калории ----------
+      'tab.schedule': 'Расписание',
+
+      'class.until': 'До {n}-й пары — {time}',
+      'class.hours': '{h} ч {m} мин',
+      'class.hoursOnly': '{h} ч',
+      'class.minutes': '{m} мин',
+      'class.now': 'Сейчас идёт {n}-я пара',
+      'class.timeToGo': 'Пора выходить!',
+      'class.dayOver': 'Занятия на сегодня закончились',
+
+      'tip.title': 'Совет дня',
+
+      'calories.burned': 'Сожжёшь ~{kcal} ккал по лестнице',
+      'calories.workout': 'хорошая тренировка!',
+      'calories.walk': 'прогулка',
+      'calories.firstFloor': 'Ты уже на 1 этаже',
+
+      'schedule.title': 'Расписание пар',
+      'schedule.subtitle': 'Персональное расписание скоро появится',
+      'schedule.description': 'Мы работаем над интеграцией с расписанием ТИУ. Здесь появится твоё персональное расписание пар с напоминаниями.',
+
       // ---------- Вкладки и экран «Новости» ----------
       'tab.elevators': 'Лифты',
       'tab.news': 'Новости',
 
       'news.title': 'Новости ТИУ',
       'news.subtitle': 'Скоро здесь появятся новости университета',
-      'news.inDevelopment': 'Функция в разработке',
+      'stub.inDevelopment': 'Функция в разработке',
       'news.description': 'Мы работаем над интеграцией с новостными каналами ТИУ. Здесь появятся свежие новости университета — прямо в приложении.',
-      'news.eta': 'Ожидаемое время: скоро',
-      'news.followChannel': 'Следите за обновлениями в нашем Telegram-канале',
+      'stub.eta': 'Ожидаемое время: скоро',
+      'stub.followChannel': 'Следите за обновлениями в нашем Telegram-канале',
 
       // ---------- Приоритет для пассажиров с ОВЗ ----------
       'priority.short': 'Приоритет — людям с ОВЗ',
@@ -465,16 +487,38 @@
       'channel.about': 'Join our Telegram channel — we post app updates, beta announcements and survey results there.',
       'channel.footer': "We're on Telegram: @tiu_go",
 
+      // ---------- Отсчёт до пары, совет дня, калории ----------
+      'tab.schedule': 'Schedule',
+
+      'class.until': 'Class {n} in {time}',
+      'class.hours': '{h} h {m} min',
+      'class.hoursOnly': '{h} h',
+      'class.minutes': '{m} min',
+      'class.now': 'Class {n} is in progress',
+      'class.timeToGo': 'Time to go!',
+      'class.dayOver': 'Classes are over for today',
+
+      'tip.title': 'Tip of the day',
+
+      'calories.burned': 'You will burn ~{kcal} kcal on the stairs',
+      'calories.workout': 'a good workout!',
+      'calories.walk': 'a stroll',
+      'calories.firstFloor': 'You are already on floor 1',
+
+      'schedule.title': 'Class schedule',
+      'schedule.subtitle': 'Your personal schedule will appear here soon',
+      'schedule.description': 'We are working on integration with the TIU schedule. Your personal class schedule with reminders will appear here.',
+
       // ---------- Вкладки и экран «Новости» ----------
       'tab.elevators': 'Elevators',
       'tab.news': 'News',
 
       'news.title': 'TIU News',
       'news.subtitle': 'University news will appear here soon',
-      'news.inDevelopment': 'Feature in development',
+      'stub.inDevelopment': 'Feature in development',
       'news.description': 'We are working on integration with TIU news channels. Fresh university news will appear here — right in the app.',
-      'news.eta': 'Expected: soon',
-      'news.followChannel': 'Follow updates in our Telegram channel',
+      'stub.eta': 'Expected: soon',
+      'stub.followChannel': 'Follow updates in our Telegram channel',
 
       // ---------- Priority for passengers with disabilities ----------
       'priority.short': 'Priority — people with disabilities',
@@ -707,16 +751,38 @@
       'channel.about': '欢迎加入我们的 Telegram 频道：应用更新、测试版公告和问卷结果都会先发布在那里。',
       'channel.footer': 'Telegram：@tiu_go',
 
+      // ---------- Отсчёт до пары, совет дня, калории ----------
+      'tab.schedule': '课表',
+
+      'class.until': '距第 {n} 节课还有 {time}',
+      'class.hours': '{h} 小时 {m} 分',
+      'class.hoursOnly': '{h} 小时',
+      'class.minutes': '{m} 分钟',
+      'class.now': '第 {n} 节课进行中',
+      'class.timeToGo': '该出发了！',
+      'class.dayOver': '今天的课已经结束',
+
+      'tip.title': '每日一句',
+
+      'calories.burned': '走楼梯约消耗 {kcal} 千卡',
+      'calories.workout': '很棒的锻炼！',
+      'calories.walk': '轻松散步',
+      'calories.firstFloor': '你已经在 1 楼了',
+
+      'schedule.title': '上课时间表',
+      'schedule.subtitle': '个人课表即将上线',
+      'schedule.description': '我们正在接入秋明工业大学的课表系统。届时你的个人课表和上课提醒将显示在这里。',
+
       // ---------- Вкладки и экран «Новости» ----------
       'tab.elevators': '电梯',
       'tab.news': '新闻',
 
       'news.title': '秋明工大新闻',
       'news.subtitle': '大学新闻即将在这里显示',
-      'news.inDevelopment': '功能开发中',
+      'stub.inDevelopment': '功能开发中',
       'news.description': '我们正在接入秋明工业大学的新闻频道。届时校园最新消息将直接显示在应用里。',
-      'news.eta': '预计时间：即将上线',
-      'news.followChannel': '请关注我们的 Telegram 频道获取更新',
+      'stub.eta': '预计时间：即将上线',
+      'stub.followChannel': '请关注我们的 Telegram 频道获取更新',
 
       // ---------- 无障碍优先 ----------
       'priority.short': '残障人士优先',

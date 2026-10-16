@@ -17,6 +17,13 @@
 const path = require('path');
 
 const base = require('../shared/params.json');
+
+// shared/public/schedule.js написан для браузера и кладёт всё в window.
+// Чтобы прочитать его отсюда, подсовываем пустой window — ровно так же
+// это делает страница.
+global.window = global.window || {};
+require('../shared/public/schedule.js');
+const schedule = global.window.TIU_SCHEDULE;
 const tech = require('../tech-model/params.js');
 const math = require('../math-model/params.js');
 const mock = require('../shared/data/mockData.js');
@@ -322,9 +329,44 @@ for (const r of probe) {
 
 console.log('');
 
+// ---------- Расписание пар ----------
+//
+// Приложению пары нужны на клиенте: отсчёт до следующей должен идти
+// с первой отрисовки и без сети. Копия лежит в shared/public/schedule.js,
+// и здесь мы следим, чтобы она не разошлась с эталоном.
+
+const scheduleProblems = [];
+
+if (!schedule || !Array.isArray(schedule.PAIRS)) {
+  scheduleProblems.push('shared/public/schedule.js не отдал PAIRS');
+} else if (schedule.PAIRS.length !== base.schedule.length) {
+  scheduleProblems.push(
+    `пар в params.json ${base.schedule.length}, в schedule.js ${schedule.PAIRS.length}`);
+} else {
+  base.schedule.forEach((want, i) => {
+    const got = schedule.PAIRS[i];
+    if (got.pair !== want.pair || got.start !== want.start || got.end !== want.end) {
+      scheduleProblems.push(
+        `пара ${want.pair}: эталон ${want.start}–${want.end}, ` +
+        `schedule.js ${got.start}–${got.end}`);
+    }
+  });
+}
+
+console.log('  ' + pad('schedule (пар)', cols.name) + ' │ ' +
+  pad('→ ' + base.schedule.length, cols.base + 2, true) + ' │ ' +
+  pad('—', cols.val, true) + ' │ ' +
+  pad('—', cols.val, true) + ' │ ' +
+  pad(String(schedule && schedule.PAIRS ? schedule.PAIRS.length : '?'), cols.val, true) + ' │ ' +
+  (scheduleProblems.length
+    ? paint(RED, '✗ расходится с schedule.js')
+    : paint(GREEN, '✓ следует')));
+
+console.log('');
+
 const broken = rows.filter((r) => r.mismatched.length > 0);
 
-if (broken.length === 0 && deaf.length === 0) {
+if (broken.length === 0 && deaf.length === 0 && scheduleProblems.length === 0) {
   console.log(paint(GREEN, '✓ Всё синхронизировано'));
   console.log(paint(DIM, '  Числа совпадают и, что важнее, действительно читаются'));
   console.log(paint(DIM, '  из shared/params.json, а не записаны в коде потребителей.'));
@@ -337,6 +379,11 @@ for (const d of deaf) {
     `✗ ${d.name}: база сказала ${d.want}, но ${d.who.join(', ')} не послушался ` +
     `(${d.who.map((k) => k + '=' + d.got[k]).join(', ')})`));
   console.log(paint(DIM, '  Значит, число задано в коде потребителя. Уберите его оттуда.'));
+}
+
+for (const problem of scheduleProblems) {
+  console.log(paint(RED, '✗ расписание: ' + problem));
+  console.log(paint(DIM, '  Правьте shared/params.json, затем перенесите в shared/public/schedule.js.'));
 }
 
 if (broken.length) console.log(paint(RED, `✗ Расхождений в таблице: ${broken.length}`));
