@@ -1946,6 +1946,13 @@ app.get('/api/health', (req, res) => {
     service: 'tiu-go',
     uptimeSec: Math.round(process.uptime()),
     admin: adminEnabled(),
+
+    // Подключена ли общая база. Если здесь memory, а в боте redis —
+    // значит переменные задали не всем сервисам, и админка будет
+    // показывать ноль пользователей при живых подписчиках
+    storage: db.isMemory() ? 'memory' : 'redis',
+    storageNote: db.describe(),
+
     subscriptions: readSubscriptions().length
   });
 });
@@ -2066,9 +2073,10 @@ if (require.main === module) {
 
       if (db.isMemory()) {
         console.warn('');
-        console.warn(`  ВНИМАНИЕ: ${db.URL_ENV} не задан — данные живут в памяти`);
-        console.warn('  процесса. Для боевого сервера заведите Upstash Redis,');
-        console.warn('  иначе статистика и пользователи пропадут при рестарте.');
+        console.warn(`  ВНИМАНИЕ: база не подключена (${db.fallbackReason()}).`);
+        console.warn('  Данные живут в памяти процесса: пропадут при рестарте');
+        console.warn('  и не видны другим сервисам. Проверьте переменные');
+        console.warn(`  ${db.URL_ENV} и ${db.TOKEN_ENV}.`);
       }
 
       console.log(`  Уведомления: проверка раз в ${NOTIFY_INTERVAL_MS / 1000} c, ` +

@@ -16,6 +16,12 @@ const TelegramBot = require('node-telegram-bot-api');
 // и берёт получателей рассылки. Раньше это был файл, но на Render у бота
 // и у сервера разные диски — список до админки просто не доезжал.
 const users = require('../shared/db/users');
+const db = require('../shared/db/redis');
+
+// Сколько людей этот процесс записал в базу с момента запуска.
+// Показывается в /health: простой способ проверить, что запись доходит.
+let usersStored = 0;
+
 
 // .env лежит в корне проекта, на уровень выше папки "tiu go tg"
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
@@ -62,6 +68,36 @@ const WELCOME = [
 ].join('\n');
 
 // ---------- Команды ----------
+/**
+ * Запоминает человека в общей базе.
+ *
+ * Зовётся на ЛЮБОЕ сообщение боту, а не только на /start. Причина простая:
+ * /start отправляют один раз в жизни. Те, кто подписался на бота раньше,
+ * чем появилась эта запись, не нажмут его больше никогда — и список
+ * пользователей так и остался бы пустым при живых подписчиках.
+ * А написать боту что угодно человек может в любой момент.
+ *
+ * token нужен, чтобы отличить пользователей этого бота от тестового.
+ * В базу он не попадает — только его отпечаток.
+ */
+function remember(chatId) {
+  users.addUser(chatId, 'telegram', { token: TOKEN })
+    .then((added) => {
+      if (added) usersStored += 1;
+        console.log('[TG] Новый пользователь', chatId);
+    })
+    .catch((err) => {
+      // Не записали — не повод ронять бота: человек ответ уже получил
+      console.error('[TG] Не удалось записать пользователя:', err.message);
+    });
+}
+
+// Запись идёт отдельным слушателем и раньше ответов: так её нельзя
+// забыть, добавив новую команду
+bot.on('message', (msg) => {
+  if (msg.chat && msg.chat.id) remember(msg.chat.id);
+});
+
 bot.onText(/^\/start\b/, (msg) => {
   // Кнопку отдаём сразу, не дожидаясь базы: человек нажал /start и должен
   // получить ответ, даже если Redis прилёг
@@ -69,17 +105,6 @@ bot.onText(/^\/start\b/, (msg) => {
     parse_mode: 'Markdown',
     ...openAppKeyboard()
   });
-
-  // token нужен, чтобы отличить пользователей этого бота от тестового.
-  // В базу он не попадает — только его отпечаток.
-  users.addUser(msg.chat.id, 'telegram', { token: TOKEN })
-    .then((added) => {
-      if (added) console.log('[TG] Новый пользователь', msg.chat.id);
-    })
-    .catch((err) => {
-      // Не записали — не повод ронять бота: человек приложение уже получил
-      console.error('[TG] Не удалось записать пользователя:', err.message);
-    });
 });
 
 bot.onText(/^\/help\b/, (msg) => {
@@ -126,6 +151,15 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       status: 'ok',
       service: 'tiu-go-telegram',
+
+      // Подключена ли общая база. Главный способ понять, почему
+      // в админке ноль пользователей: если здесь memory, значит этому
+      // сервису не задали UPSTASH_REDIS_REST_URL, и всё, что он пишет,
+      // не видит никто другой.
+      storage: db.isMemory() ? 'memory' : 'redis',
+      storageNote: db.describe(),
+      usersStored: usersStored,
+
       uptime: process.uptime(),
       timestamp: new Date().toISOString()
     }));

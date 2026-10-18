@@ -23,6 +23,12 @@ const axios = require('axios');
 // и берёт получателей рассылки. Раньше это был файл, но на Render у бота
 // и у сервера разные диски — список до админки просто не доезжал.
 const users = require('../shared/db/users');
+const db = require('../shared/db/redis');
+
+// Сколько людей этот процесс записал в базу с момента запуска.
+// Показывается в /health: простой способ проверить, что запись доходит.
+let usersStored = 0;
+
 
 // .env лежит в корне проекта, на уровень выше папки "tiu go max"
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
@@ -129,6 +135,29 @@ function parseUpdate(update) {
 async function handleUpdate(update) {
   const event = parseUpdate(update);
 
+  // Запоминаем на ЛЮБОЕ событие, а не только на /start: его отправляют
+  // один раз в жизни, и те, кто подписался раньше, чем появилась эта
+  // запись, не нажмут его больше никогда.
+  //
+  // В личке MAX присылает только отправителя, chat_id бывает пустым —
+  // тогда адресовать сообщения придётся по user_id.
+  const hasChat = event.chatId !== undefined && event.chatId !== null;
+  const id = hasChat ? event.chatId : event.userId;
+
+  if (id !== undefined && id !== null) {
+    try {
+      const added = await users.addUser(id, 'max', {
+        token: TOKEN,
+        addressBy: hasChat ? 'chat' : 'user'
+      });
+      if (added) usersStored += 1;
+      console.log('[MAX] Новый пользователь', id);
+    } catch (err) {
+      // Не записали — не повод ронять бота
+      console.error('[MAX] Не удалось записать пользователя:', err.message);
+    }
+  }
+
   // Новый пользователь нажал «Начать» — это тоже повод показать приложение
   const isStartEvent = event.type === 'bot_started';
   const isStartCommand = /^\/start\b/.test(event.text);
@@ -137,23 +166,6 @@ async function handleUpdate(update) {
     console.log('[MAX] /start от пользователя', event.userId || event.chatId);
 
     await sendMessage({ chatId: event.chatId, userId: event.userId, text: WELCOME });
-
-    // В личке MAX присылает только отправителя, chat_id бывает пустым —
-    // тогда адресуем по user_id. token в базу не попадает, только отпечаток.
-    try {
-      const hasChat = event.chatId !== undefined && event.chatId !== null;
-
-      const added = await users.addUser(
-        hasChat ? event.chatId : event.userId,
-        'max',
-        { token: TOKEN, addressBy: hasChat ? 'chat' : 'user' }
-      );
-      if (added) console.log('[MAX] Новый пользователь', event.userId || event.chatId);
-    } catch (err) {
-      // Не записали — не повод ронять бота: человек приложение уже получил
-      console.error('[MAX] Не удалось записать пользователя:', err.message);
-    }
-
     return;
   }
 
@@ -233,6 +245,15 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       status: 'ok',
       service: 'tiu-go-max',
+
+      // Подключена ли общая база. Главный способ понять, почему
+      // в админке ноль пользователей: если здесь memory, значит этому
+      // сервису не задали UPSTASH_REDIS_REST_URL, и всё, что он пишет,
+      // не видит никто другой.
+      storage: db.isMemory() ? 'memory' : 'redis',
+      storageNote: db.describe(),
+      usersStored: usersStored,
+
       uptime: process.uptime(),
       timestamp: new Date().toISOString()
     }));

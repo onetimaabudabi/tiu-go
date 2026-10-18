@@ -89,6 +89,13 @@ function createMemoryStore() {
       return result;
     },
 
+    async hdel(key, ...fields) {
+      const store = hash(key);
+      let removed = 0;
+      fields.flat().forEach((field) => { if (store.delete(field)) removed += 1; });
+      return removed;
+    },
+
     async expire(key) {
       // Срок жизни ключа в памяти не нужен: процесс и так умрёт раньше.
       // Метод есть, чтобы код сброса статистики шёл одним путём с Redis.
@@ -103,29 +110,78 @@ function createMemoryStore() {
 
 let client = null;
 let usingMemory = false;
+let fallbackReason = null;
 
-/** Клиент: настоящий Redis или хранилище в памяти. Создаётся один раз. */
+/**
+ * Значение переменной окружения: без пробелов по краям и без кавычек.
+ *
+ * Кавычки — самая частая ошибка при настройке хостинга. В файле .env
+ * запись KEY="значение" законна, и dotenv кавычки снимает сам. А в панели
+ * Render поле значения берётся как есть, и вставленные туда кавычки
+ * становятся частью адреса: получается ключ "https://..." с кавычками
+ * внутри, и клиент Upstash отказывается с ним работать.
+ */
+function envValue(name) {
+  let value = (process.env[name] || '').trim();
+
+  const first = value.charAt(0);
+  const last = value.charAt(value.length - 1);
+
+  if (value.length >= 2 && first === last && (first === '"' || first === "'")) {
+    value = value.slice(1, -1).trim();
+  }
+
+  return value;
+}
+
+/** Переходим на память процесса и громко объясняем почему. */
+function fallBack(reason) {
+  usingMemory = true;
+  fallbackReason = reason;
+  client = createMemoryStore();
+  return client;
+}
+
+/**
+ * Клиент: настоящий Redis или хранилище в памяти. Создаётся один раз.
+ *
+ * Эта функция НЕ БРОСАЕТ исключений — ни при каких настройках. Её зовут
+ * из обработчиков запросов и из колбэка app.listen, где исключение валит
+ * весь процесс: ровно так сервер и умирал при адресе, вставленном
+ * в Render вместе с кавычками. Плохие настройки базы не должны ронять
+ * мини-апп: показывать лифты важнее, чем копить статистику.
+ */
 function getClient() {
   if (client) return client;
 
-  const url = (process.env[URL_ENV] || '').trim();
-  const token = (process.env[TOKEN_ENV] || '').trim();
+  const url = envValue(URL_ENV);
+  const token = envValue(TOKEN_ENV);
 
   if (!url || !token) {
-    usingMemory = true;
-    client = createMemoryStore();
-    return client;
+    return fallBack('переменные ' + URL_ENV + ' и ' + TOKEN_ENV + ' не заданы');
   }
 
-  // require внутри функции, а не наверху файла: без переменных окружения
-  // библиотека не нужна вовсе, и проект должен подниматься даже там,
-  // где её не успели поставить
-  const { Redis } = require('@upstash/redis');
+  if (!/^https:\/\//i.test(url)) {
+    console.error('[база] ' + URL_ENV + ' должен начинаться с https:// — получено: ' + url);
+    console.error('[база] Проверьте, что в значении нет кавычек и пробелов.');
+    return fallBack(URL_ENV + ' не похож на адрес (' + url + ')');
+  }
 
-  client = new Redis({ url: url, token: token });
-  usingMemory = false;
+  try {
+    // require внутри функции, а не наверху файла: без переменных окружения
+    // библиотека не нужна вовсе, и проект должен подниматься даже там,
+    // где её не успели поставить
+    const { Redis } = require('@upstash/redis');
 
-  return client;
+    client = new Redis({ url: url, token: token });
+    usingMemory = false;
+    fallbackReason = null;
+
+    return client;
+  } catch (err) {
+    console.error('[база] Не удалось создать клиент Redis:', err.message);
+    return fallBack('клиент не создался: ' + err.message);
+  }
 }
 
 /** Работаем с настоящим Redis или с памятью процесса? */
@@ -137,15 +193,13 @@ function isMemory() {
 /** Одна строка о состоянии базы — её печатает сервер при старте. */
 function describe() {
   if (isMemory()) {
-    return 'в памяти процесса (не задан ' + URL_ENV + ') — ' +
+    return 'в памяти процесса (' + (fallbackReason || 'причина неизвестна') + ') — ' +
       'данные пропадут при остановке и не видны другим сервисам';
   }
 
-  const url = (process.env[URL_ENV] || '').trim();
-
   // Адрес показываем без токена: в логах Render его видит кто угодно,
   // у кого есть доступ к дашборду
-  return 'Upstash Redis, ' + url.replace(/^https?:\/\//, '');
+  return 'Upstash Redis, ' + envValue(URL_ENV).replace(/^https?:\/\//, '');
 }
 
 /** Живая ли база. Нужна серверу при старте, чтобы не узнать о проблеме позже. */
@@ -161,8 +215,10 @@ async function check() {
 module.exports = {
   URL_ENV,
   TOKEN_ENV,
+  envValue,
   getClient,
   isMemory,
+  fallbackReason: () => fallbackReason,
   describe,
   check,
   createMemoryStore
