@@ -14,6 +14,7 @@
     "presentation:preview": "node presentation/preview.js",
     "mockup": "node screenshots/capture.js --mockup-only",
     "check:params": "node scripts/check-params.js",
+    "clone-test": "node scripts/clone-test.js",
     "3d:dev": "vite 3d-sim",
     "3d:build": "vite build 3d-sim",
     "3d:preview": "vite preview 3d-sim",

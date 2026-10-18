@@ -4,42 +4,183 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>TIU GO — админка лифтов</title>
+  <title>TIU GO — админ-панель</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="admin.css" />
 </head>
 <body>
 
   <!-- Спрайт иконок подгружает admin.js из icons.svg -->
 
-  <header class="head">
-    <div>
-      <h1 class="head__title">Админка лифтов</h1>
-      <p class="head__sub" id="head-sub">Корпус 7, Мельникайте 70 · тестовые данные</p>
-    </div>
+  <!-- ══ ЭКРАН 1: вход ══════════════════════════════════════ -->
+  <main class="login" id="screen-login">
+    <form class="login__card" id="login-form" autocomplete="on">
+      <span class="login__badge">
+        <svg class="icon" aria-hidden="true"><use href="#icon-lock"></use></svg>
+      </span>
 
-    <div class="head__actions">
-      <button class="btn" id="btn-reset" type="button">
-        <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
-        Сбросить к случайным
-      </button>
-      <button class="btn" id="btn-all-working" type="button">
-        <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
-        Все работают
-      </button>
-      <button class="btn" id="btn-test-push" type="button">
-        <svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg>
-        Тестовое уведомление
-      </button>
-    </div>
-  </header>
+      <h1 class="login__title">TIU GO</h1>
+      <p class="login__sub">Админ-панель · управление лифтами и рассылка</p>
 
-  <p class="hint">
-    Значения, выставленные вручную, замирают — симуляция перестаёт их менять.
-    Вернуть лифт в движение можно кнопкой «Сбросить к случайным».
-    Всё хранится в памяти сервера: после перезапуска данные снова станут случайными.
-  </p>
+      <label class="field">
+        <span class="field__label">Логин</span>
+        <input class="input" id="login-user" name="username" type="text"
+               autocomplete="username" autocapitalize="off" spellcheck="false" required />
+      </label>
 
-  <main class="list" id="list"><!-- карточки строит admin.js --></main>
+      <label class="field">
+        <span class="field__label">Пароль</span>
+        <input class="input" id="login-pass" name="password" type="password"
+               autocomplete="current-password" required />
+      </label>
+
+      <p class="login__error" id="login-error" hidden></p>
+
+      <button class="btn btn--accent btn--wide" id="login-submit" type="submit">
+        <svg class="icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+        Войти
+      </button>
+
+      <p class="login__note">
+        Логин и пароль задаются в файле <code>.env</code>
+        (<code>ADMIN_USERNAME</code>, <code>ADMIN_PASSWORD</code>).
+      </p>
+    </form>
+  </main>
+
+  <!-- ══ ЭКРАН 2: дашборд ═══════════════════════════════════ -->
+  <div id="screen-app" hidden>
+
+    <header class="head">
+      <div>
+        <h1 class="head__title">Админ-панель</h1>
+        <p class="head__sub" id="head-sub">Корпус 7, Мельникайте 70</p>
+      </div>
+
+      <div class="head__actions">
+        <button class="btn" id="btn-logout" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-logout"></use></svg>
+          Выйти
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button class="tabs__btn is-on" type="button" data-tab="lifts">
+        <svg class="icon" aria-hidden="true"><use href="#icon-elevator"></use></svg>
+        Лифты
+      </button>
+      <button class="tabs__btn" type="button" data-tab="stats">
+        <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+        Статистика
+      </button>
+      <button class="tabs__btn" type="button" data-tab="cast">
+        <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
+        Рассылка
+      </button>
+    </nav>
+
+    <!-- ── Вкладка «Лифты» ── -->
+    <section class="tab" id="tab-lifts">
+      <div class="head__actions head__actions--row">
+        <button class="btn" id="btn-reset" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+          Сбросить к случайным
+        </button>
+        <button class="btn" id="btn-all-working" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+          Все работают
+        </button>
+        <button class="btn" id="btn-test-push" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg>
+          Тестовое уведомление
+        </button>
+      </div>
+
+      <p class="hint">
+        Значения, выставленные вручную, замирают — симуляция перестаёт их менять.
+        Вернуть лифт в движение можно кнопкой «Сбросить к случайным».
+        Всё хранится в памяти сервера: после перезапуска данные снова станут случайными.
+      </p>
+
+      <div class="list" id="list"><!-- карточки строит admin.js --></div>
+    </section>
+
+    <!-- ── Вкладка «Статистика» ── -->
+    <section class="tab" id="tab-stats" hidden>
+      <div class="metrics" id="metrics"><!-- цифры строит admin.js --></div>
+
+      <div class="panel">
+        <h2 class="panel__title">
+          <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+          Запросы к API по часам
+        </h2>
+        <p class="panel__sub">
+          Обращения к <code>/api/status</code> за последние 24 часа.
+          Последний столбец — текущий час, он ещё не закончился.
+        </p>
+
+        <div class="chart" id="chart"><!-- столбцы строит admin.js --></div>
+      </div>
+
+      <p class="hint">
+        Пользователи считаются по файлу <code>shared/data/users.json</code> — туда
+        боты дописывают каждого, кто отправил <code>/start</code>. В счёт идут
+        только пользователи ботов, чьи токены прописаны в <code>.env</code> этого
+        проекта: у тестового бота токен другой, и его пользователи в цифры
+        не попадают. Счётчик запросов живёт в <code>shared/data/stats.json</code>
+        и переживает перезапуск сервера.
+      </p>
+    </section>
+
+    <!-- ── Вкладка «Рассылка» ── -->
+    <section class="tab" id="tab-cast" hidden>
+      <div class="panel">
+        <h2 class="panel__title">
+          <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
+          Сообщение всем пользователям
+        </h2>
+        <p class="panel__sub">
+          Обычный текст без разметки — он уйдёт и в Telegram, и в MAX.
+        </p>
+
+        <textarea class="cast__area" id="cast-text" maxlength="3500"
+                  placeholder="Например: лифт 3 снова работает — ремонт закончен."></textarea>
+
+        <div class="cast__row">
+          <button class="btn btn--accent" id="btn-cast" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
+            Отправить всем
+          </button>
+          <button class="btn" id="btn-cast-cancel" type="button" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+            Остановить
+          </button>
+          <span class="cast__count" id="cast-count">0 / 3500</span>
+        </div>
+
+        <p class="warn" id="cast-warn">
+          <svg class="icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+          <span id="cast-warn-text">Получателей пока нет.</span>
+        </p>
+
+        <div class="progress" id="cast-progress" hidden>
+          <div class="progress__track">
+            <div class="progress__fill" id="cast-fill"></div>
+          </div>
+          <p class="progress__text" id="cast-progress-text">Отправлено 0 из 0</p>
+        </div>
+      </div>
+
+      <p class="hint">
+        Между сообщениями сервер держит паузу 50 мс — это 20 сообщений в секунду,
+        с запасом от лимита Telegram (около 30). Если кто-то заблокировал бота,
+        его просто пропускаем и идём дальше: такие получатели попадают в «ошибок».
+        Отправка идёт на сервере, страницу можно закрыть.
+      </p>
+    </section>
+
+  </div>
 
   <div class="toast" id="toast" hidden></div>
 

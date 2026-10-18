@@ -12,6 +12,10 @@ const http = require('http');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 
+// Общий список пользователей: из него админка считает статистику
+// и берёт получателей рассылки
+const users = require('../shared/data/users');
+
 // .env лежит в корне проекта, на уровень выше папки "tiu go tg"
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -58,6 +62,22 @@ const WELCOME = [
 
 // ---------- Команды ----------
 bot.onText(/^\/start\b/, (msg) => {
+  // Запоминаем пользователя — но не даём файлу уронить ответ боту:
+  // человек нажал /start и должен получить кнопку независимо от диска
+  try {
+    // token нужен, чтобы отличить пользователей этого бота от тестового.
+    // В файл он не пишется — только его отпечаток.
+    const result = users.addUser({
+      chatId: msg.chat.id,
+      platform: 'tg',
+      token: TOKEN
+    });
+    if (result.added) console.log('[TG] Новый пользователь', msg.chat.id,
+      '· всего', result.total);
+  } catch (err) {
+    console.error('[TG] Не удалось записать пользователя:', err.message);
+  }
+
   bot.sendMessage(msg.chat.id, WELCOME, {
     parse_mode: 'Markdown',
     ...openAppKeyboard()

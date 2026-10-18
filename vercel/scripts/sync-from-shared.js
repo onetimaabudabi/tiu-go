@@ -136,6 +136,45 @@ write(path.join(VERCEL, 'lib', 'mockData.js'), mock);
 console.log('Сервер:');
 let server = fs.readFileSync(path.join(SHARED, 'server.js'), 'utf8');
 
+// ── Стоп-кран: админ-панель ещё не перенесена в serverless ──
+//
+// В shared/server.js появились модули shared/data/users.js и stats.js
+// (пользователи ботов и счётчик обращений к API), а вместе с ними —
+// рассылка сообщений всем пользователям. В vercel/ ничего этого нет,
+// и просто скопировать нельзя:
+//
+//   users.js / stats.js — пишут в файлы, здесь файловая система только
+//     на чтение. Нужен перенос в storage.js, как сделано для подписок.
+//   Токен сессии — генерируется при старте процесса. На Vercel процессов
+//     много и живут они недолго: токен, выданный одним, другой не узнает.
+//     Нужно общее хранилище сессий.
+//   Рассылка — крутится в фоне после ответа клиенту. В serverless функцию
+//     убивают сразу после ответа, цикл оборвётся на первом же получателе.
+//     Нужна очередь, а не цикл в памяти.
+//
+// Пока этого нет, скрипт останавливается здесь: собрать копию он может,
+// но она упадёт при первом же запросе на require('./data/users'). Лучше
+// честная остановка, чем сломанный деплой.
+if (server.indexOf("require('./data/users')") !== -1) {
+  console.error('');
+  console.error('  ✗ Остановлено: админ-панель из shared/ не переносится в serverless.');
+  console.error('');
+  console.error('    В shared/server.js появились users.js, stats.js и рассылка.');
+  console.error('    Им нужны запись на диск, общий токен сессии и фоновая задача —');
+  console.error('    всего этого в serverless-функции нет. Подробности в комментарии');
+  console.error('    к этой проверке в scripts/sync-from-shared.js.');
+  console.error('');
+  console.error('    Что можно сделать:');
+  console.error('      1. перенести users/stats в lib/storage.js (как подписки);');
+  console.error('      2. хранить токен сессии там же, а не в памяти процесса;');
+  console.error('      3. рассылку либо убрать из vercel-версии, либо вынести в очередь;');
+  console.error('      4. после этого снять эту проверку.');
+  console.error('');
+  console.error('    Копии в vercel/ остались прежними — деплой рабочий,');
+  console.error('    просто без админ-панели нового образца.');
+  process.exit(1);
+}
+
 server = patch(server,
   "const mock = require('./data/mockData');",
   "const mock = require('./mockData');\nconst storage = require('./storage');",

@@ -15,6 +15,12 @@ math-model/output/
 # Подписки на уведомления содержат chatId пользователей — в репозиторий не попадают
 shared/data/subscriptions.json
 
+# Список пользователей ботов — тоже живые chatId
+shared/data/users.json
+
+# Счётчик обращений к API копится на сервере сам
+shared/data/stats.json
+
 # Результаты технической модели пересчитываются командой npm run tech:all
 tech-model/output/
 

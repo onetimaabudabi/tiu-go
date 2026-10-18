@@ -1,16 +1,20 @@
 /**
- * TIU GO — админка управления лифтами.
+ * TIU GO — админ-панель.
  *
- * Служебная страница для демонстраций и тестов: позволяет выставить
- * статус работы лифта, пояснение к нему и «сырые» показания датчиков.
+ * Два экрана: вход по логину с паролем и дашборд из трёх вкладок.
  *
- * Поле «Ждут на 1 этаже» — это то, что считает камера в холле внизу.
- * Им удобно проверять плашку на главном экране: сумма по всем лифтам
- * до 5 даёт зелёную, 6–15 жёлтую, 16 и больше — красную.
- * Данные живут в памяти сервера и сбрасываются при его перезапуске.
+ *   Лифты      — статус работы, пояснение к нему и «сырые» показания датчиков.
+ *   Статистика — пользователи ботов и обращения к /api/status по часам.
+ *   Рассылка   — сообщение всем, кто писал боту /start.
  *
- * Страница открывается только при ADMIN_ENABLED=true в .env — иначе
- * и она, и ручки /api/admin отвечают 404.
+ * Токен сессии приходит от POST /api/admin/login и лежит в localStorage.
+ * Сервер генерирует его при старте, поэтому перезапуск сервера
+ * разлогинивает страницу: любой запрос отвечает 401, и мы возвращаем
+ * экран входа. Это не ошибка, а и есть защита.
+ *
+ * Поле «Ждут на 1 этаже» — то, что считает камера в холле внизу. Им удобно
+ * проверять плашку на главном экране: сумма по всем лифтам до 5 даёт
+ * зелёную, 6-15 жёлтую, 16 и больше — красную.
  *
  * Локализации здесь намеренно нет: это внутренний инструмент.
  */
@@ -20,6 +24,9 @@
 
   var ICONS = window.TIU_ICONS;
 
+  var TOKEN_KEY = 'tiu-go-admin-token';
+  var TAB_KEY = 'tiu-go-admin-tab';
+
   var STATUS_LABELS = {
     working: 'Работает',
     broken: 'Сломан',
@@ -28,19 +35,59 @@
 
   var STATUS_ORDER = ['working', 'broken', 'maintenance'];
 
+  var TABS = ['lifts', 'stats', 'cast'];
+
+  // Как часто обновляем цифры на открытой вкладке «Статистика»
+  var STATS_REFRESH_MS = 15000;
+
+  // Как часто спрашиваем сервер о ходе рассылки
+  var CAST_POLL_MS = 1000;
+
+  var CAST_MAX = 3500; // столько же стоит в server.js (BROADCAST_MAX_LENGTH)
+
   var $ = function (id) { return document.getElementById(id); };
 
   var el = {
-    list: $('list'),
+    login: $('screen-login'),
+    loginForm: $('login-form'),
+    loginUser: $('login-user'),
+    loginPass: $('login-pass'),
+    loginError: $('login-error'),
+    loginSubmit: $('login-submit'),
+
+    app: $('screen-app'),
     headSub: $('head-sub'),
+    logout: $('btn-logout'),
+    tabs: $('tabs'),
     toast: $('toast'),
+
+    list: $('list'),
     reset: $('btn-reset'),
     allWorking: $('btn-all-working'),
-    testPush: $('btn-test-push')
+    testPush: $('btn-test-push'),
+
+    metrics: $('metrics'),
+    chart: $('chart'),
+
+    castText: $('cast-text'),
+    castSend: $('btn-cast'),
+    castCancel: $('btn-cast-cancel'),
+    castCount: $('cast-count'),
+    castWarn: $('cast-warn'),
+    castWarnText: $('cast-warn-text'),
+    castProgress: $('cast-progress'),
+    castFill: $('cast-fill'),
+    castProgressText: $('cast-progress-text')
   };
 
+  var token = null;
   var limits = { floors: 16, maxWaiting: 20 };
+  var activeTab = 'lifts';
+  var recipients = 0;
+
   var toastTimer = null;
+  var statsTimer = null;
+  var castTimer = null;
 
   // ---------- Сообщения ----------
 
@@ -54,19 +101,49 @@
     toastTimer = setTimeout(function () { el.toast.hidden = true; }, 3500);
   }
 
+  function plural(count, one, few, many) {
+    var mod100 = count % 100;
+    var mod10 = count % 10;
+
+    if (mod100 >= 11 && mod100 <= 14) return many;
+    if (mod10 === 1) return one;
+    if (mod10 >= 2 && mod10 <= 4) return few;
+    return many;
+  }
+
+  /** «1 пользователю» / «2 пользователям» — склонение в предупреждении рассылки. */
+  function usersDative(count) {
+    return count + ' ' + plural(count, 'пользователю', 'пользователям', 'пользователям');
+  }
+
   // ---------- Запросы ----------
 
+  /**
+   * Запрос к /api/admin. Токен подставляется сам.
+   * 401 значит «сессия больше не действует» — возвращаем экран входа,
+   * не дожидаясь, пока человек нажмёт что-то ещё.
+   */
   function api(path, options) {
-    return fetch('api/admin' + path, options)
+    var config = options || {};
+    var headers = Object.assign({}, config.headers || {});
+
+    if (token) headers.Authorization = 'Bearer ' + token;
+
+    return fetch('api/admin' + path, Object.assign({}, config, { headers: headers }))
       .then(function (res) {
-        return res.json().catch(function () {
-          throw new Error('HTTP ' + res.status);
-        }).then(function (body) {
-          if (!res.ok || body.success === false) {
-            throw new Error(body.error || 'HTTP ' + res.status);
-          }
-          return body;
-        });
+        if (res.status === 401) {
+          showLogin('Сессия закрыта. Войдите снова.');
+          throw new Error('Нужен вход');
+        }
+
+        return res.json()
+          .catch(function () { throw new Error('HTTP ' + res.status); })
+          .then(function (body) {
+            if (!res.ok || body.success === false) {
+              throw new Error(body.error || 'HTTP ' + res.status);
+            }
+            return body;
+          });
       });
   }
 
@@ -78,7 +155,144 @@
     });
   }
 
-  // ---------- Разметка карточки ----------
+  // ---------- Вход и выход ----------
+
+  function readToken() {
+    try {
+      return localStorage.getItem(TOKEN_KEY);
+    } catch (err) {
+      return null; // приватный режим браузера — просто поработаем без памяти
+    }
+  }
+
+  function saveToken(value) {
+    try {
+      if (value) localStorage.setItem(TOKEN_KEY, value);
+      else localStorage.removeItem(TOKEN_KEY);
+    } catch (err) {
+      // не смогли запомнить — вход просто не переживёт перезагрузку страницы
+    }
+  }
+
+  function showLogin(message) {
+    token = null;
+    saveToken(null);
+    stopTimers();
+
+    el.app.hidden = true;
+    el.login.hidden = false;
+
+    el.loginPass.value = '';
+    el.loginError.hidden = !message;
+    if (message) el.loginError.textContent = message;
+
+    el.loginUser.focus();
+  }
+
+  function showApp() {
+    el.login.hidden = true;
+    el.app.hidden = false;
+
+    switchTab(activeTab);
+  }
+
+  el.loginForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    var username = el.loginUser.value.trim();
+    var password = el.loginPass.value;
+
+    if (!username || !password) {
+      el.loginError.textContent = 'Заполните логин и пароль';
+      el.loginError.hidden = false;
+      return;
+    }
+
+    el.loginSubmit.disabled = true;
+    el.loginError.hidden = true;
+
+    fetch('api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password })
+    })
+      .then(function (res) {
+        return res.json()
+          .catch(function () { throw new Error('HTTP ' + res.status); })
+          .then(function (body) {
+            if (!res.ok || !body.token) {
+              throw new Error(body.error || 'HTTP ' + res.status);
+            }
+            return body;
+          });
+      })
+      .then(function (body) {
+        token = body.token;
+        saveToken(token);
+
+        el.loginPass.value = '';
+        showApp();
+        toast('Вход выполнен');
+      })
+      .catch(function (err) {
+        el.loginError.textContent = err.message;
+        el.loginError.hidden = false;
+      })
+      .then(function () {
+        el.loginSubmit.disabled = false;
+      });
+  });
+
+  el.logout.addEventListener('click', function () {
+    showLogin('');
+  });
+
+  // ---------- Вкладки ----------
+
+  function stopTimers() {
+    clearInterval(statsTimer);
+    clearInterval(castTimer);
+    statsTimer = null;
+    castTimer = null;
+  }
+
+  function switchTab(name) {
+    activeTab = TABS.indexOf(name) === -1 ? 'lifts' : name;
+
+    try {
+      localStorage.setItem(TAB_KEY, activeTab);
+    } catch (err) {
+      // не запомнили выбранную вкладку — не повод ломать страницу
+    }
+
+    TABS.forEach(function (tab) {
+      $('tab-' + tab).hidden = tab !== activeTab;
+    });
+
+    Array.prototype.forEach.call(el.tabs.children, function (button) {
+      button.classList.toggle('is-on', button.dataset.tab === activeTab);
+    });
+
+    stopTimers();
+
+    if (activeTab === 'lifts') {
+      loadLifts();
+    } else if (activeTab === 'stats') {
+      loadStats();
+      statsTimer = setInterval(function () {
+        if (!document.hidden) loadStats();
+      }, STATS_REFRESH_MS);
+    } else {
+      loadCast();
+    }
+  }
+
+  el.tabs.addEventListener('click', function (event) {
+    var button = event.target.closest('.tabs__btn');
+    if (button) switchTab(button.dataset.tab);
+  });
+
+  // ---------- Вкладка «Лифты» ----------
 
   function numberField(id, label, value, min, max) {
     return '' +
@@ -115,9 +329,9 @@
       '<div class="seg" data-seg>' + segments + '</div>' +
 
       '<label class="field">' +
-        '<span class="field__label">Пояснение к статусу</span>' +
+        '<span class="field__label">Комментарий — его увидит человек на экране лифта</span>' +
         '<input class="input" type="text" data-field="statusNote" maxlength="120" ' +
-          'placeholder="Например: плановый ремонт до 15:00" value="' + note + '" />' +
+          'placeholder="Например: ремонт до 15:00" value="' + note + '" />' +
       '</label>' +
 
       '<div class="nums">' +
@@ -128,12 +342,12 @@
       '</div>' +
 
       '<button class="btn btn--accent" type="button" data-save>' +
-        ICONS.icon('check') + ' Сохранить</button>';
+        ICONS.icon('check') + ' Сохранить изменения</button>';
 
     return card;
   }
 
-  function render(elevators) {
+  function renderLifts(elevators) {
     el.list.innerHTML = '';
     elevators.forEach(function (lift) { el.list.appendChild(liftCard(lift)); });
 
@@ -145,23 +359,22 @@
       working + ' из ' + elevators.length;
   }
 
-  // ---------- Загрузка и сохранение ----------
-
-  function load() {
+  function loadLifts() {
     return api('/elevators')
       .then(function (body) {
         limits.floors = body.floors || limits.floors;
         limits.maxWaiting = body.maxWaiting || limits.maxWaiting;
-        render(body.elevators);
+        renderLifts(body.elevators);
       })
       .catch(function (err) {
+        if (err.message === 'Нужен вход') return;
         el.list.innerHTML = '<p class="hint">Не удалось загрузить лифты: ' +
           err.message + '</p>';
       });
   }
 
   /** Собирает значения формы одной карточки и отправляет их на сервер. */
-  function save(card) {
+  function saveLift(card) {
     var id = card.dataset.id;
     var active = card.querySelector('.seg__btn.is-on');
 
@@ -176,20 +389,18 @@
     var button = card.querySelector('[data-save]');
     button.disabled = true;
 
-    return post('/elevator/' + id, body)
+    return post('/elevators/' + id, body)
       .then(function () {
         toast('Лифт ' + id + ' обновлён');
-        return load();
+        return loadLifts();
       })
       .catch(function (err) {
-        toast('Ошибка: ' + err.message, 'error');
+        if (err.message !== 'Нужен вход') toast('Ошибка: ' + err.message, 'error');
       })
       .then(function () {
         button.disabled = false;
       });
   }
-
-  // ---------- События ----------
 
   el.list.addEventListener('click', function (event) {
     var segment = event.target.closest('.seg__btn');
@@ -206,25 +417,26 @@
     }
 
     var saveButton = event.target.closest('[data-save]');
-    if (saveButton) save(saveButton.closest('.lift'));
+    if (saveButton) saveLift(saveButton.closest('.lift'));
   });
 
-  el.reset.addEventListener('click', function () {
-    post('/reset')
+  function liftAction(path, message) {
+    return post(path)
       .then(function (body) {
-        render(body.elevators);
-        toast('Значения сброшены к случайным');
+        renderLifts(body.elevators);
+        toast(message);
       })
-      .catch(function (err) { toast('Ошибка: ' + err.message, 'error'); });
+      .catch(function (err) {
+        if (err.message !== 'Нужен вход') toast('Ошибка: ' + err.message, 'error');
+      });
+  }
+
+  el.reset.addEventListener('click', function () {
+    liftAction('/reset', 'Значения сброшены к случайным');
   });
 
   el.allWorking.addEventListener('click', function () {
-    post('/all-working')
-      .then(function (body) {
-        render(body.elevators);
-        toast('Все лифты переведены в «работает»');
-      })
-      .catch(function (err) { toast('Ошибка: ' + err.message, 'error'); });
+    liftAction('/all-working', 'Все лифты переведены в «работает»');
   });
 
   el.testPush.addEventListener('click', function () {
@@ -235,12 +447,243 @@
         if (!body.total) toast('Подписок пока нет — отправлять некому');
         else toast('Отправлено ' + body.sent + ' из ' + body.total);
       })
-      .catch(function (err) { toast('Ошибка: ' + err.message, 'error'); })
+      .catch(function (err) {
+        if (err.message !== 'Нужен вход') toast('Ошибка: ' + err.message, 'error');
+      })
       .then(function () { el.testPush.disabled = false; });
+  });
+
+  // ---------- Вкладка «Статистика» ----------
+
+  function metricCard(name, label, value, hint) {
+    return '' +
+      '<div class="metric">' +
+        '<div class="metric__label">' + ICONS.icon(name) + label + '</div>' +
+        '<div class="metric__value">' + value + '</div>' +
+        '<div class="metric__hint">' + hint + '</div>' +
+      '</div>';
+  }
+
+  function renderStats(body) {
+    var api24 = body.api;
+
+    // Подзаголовок обновляем и отсюда: иначе, если страница открылась
+    // сразу на «Статистике», в шапке не было бы счёта работающих лифтов
+    el.headSub.textContent = 'Корпус 7, Мельникайте 70 · работают ' +
+      body.elevators.working + ' из ' + body.elevators.total;
+
+    // Пользователи тестовых ботов в цифру не входят — но сказать о них надо,
+    // иначе непонятно, почему в users.json записей больше
+    var usersHint = 'Telegram ' + body.users.tg + ' · MAX ' + body.users.max;
+    if (body.users.others) {
+      usersHint += ' · ещё ' + body.users.others + ' у других ботов';
+    }
+
+    el.metrics.innerHTML =
+      metricCard('users', 'Всего пользователей', body.users.total, usersHint) +
+      metricCard('signal', 'Всего запросов к API', api24.total,
+        'с момента первого запуска') +
+      metricCard('clock', 'Запросов сегодня', api24.today,
+        'с начала суток') +
+      metricCard('bell', 'Подписок на уведомления', body.subscriptions,
+        'жалоб на лифты: ' + body.reports);
+
+    renderChart(api24.hours);
+  }
+
+  /**
+   * Бар-чарт из 24 столбцов. Высоту считаем в процентах от самого
+   * большого часа: абсолютная шкала при двадцати запросах показывала бы
+   * двадцать неразличимых полосок у самого низа.
+   */
+  function renderChart(hours) {
+    var peak = hours.reduce(function (max, cell) {
+      return Math.max(max, cell.count);
+    }, 0);
+
+    if (!peak) {
+      el.chart.innerHTML = '<p class="chart__empty">За сутки обращений к API не было. ' +
+        'Откройте мини-апп — и столбцы появятся.</p>';
+      return;
+    }
+
+    el.chart.innerHTML = hours.map(function (cell, index) {
+      var height = Math.max(Math.round(cell.count / peak * 100), cell.count ? 4 : 1);
+      var isNow = index === hours.length - 1;
+
+      // Подпись ставим через три часа: двадцать четыре подряд не читаются
+      var label = cell.hour % 3 === 0 ? cell.label.slice(0, 2) : '';
+
+      return '<div class="chart__col' + (isNow ? ' is-now' : '') + '" ' +
+        'title="' + cell.label + ' — ' + cell.count + '">' +
+          '<div class="chart__bar" style="height:' + height + '%"></div>' +
+          '<span class="chart__hour">' + label + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function loadStats() {
+    return api('/stats')
+      .then(renderStats)
+      .catch(function (err) {
+        if (err.message === 'Нужен вход') return;
+        el.metrics.innerHTML = '<p class="hint">Не удалось загрузить статистику: ' +
+          err.message + '</p>';
+      });
+  }
+
+  // ---------- Вкладка «Рассылка» ----------
+
+  function updateCastCount() {
+    el.castCount.textContent = el.castText.value.length + ' / ' + CAST_MAX;
+  }
+
+  el.castText.addEventListener('input', updateCastCount);
+
+  /** Показывает ход рассылки; возвращает true, пока она не закончилась. */
+  function renderProgress(progress) {
+    if (!progress) {
+      el.castProgress.hidden = true;
+      el.castCancel.hidden = true;
+      return false;
+    }
+
+    var done = progress.sent + progress.failed;
+    var share = progress.total ? Math.round(done / progress.total * 100) : 0;
+
+    el.castProgress.hidden = false;
+    el.castFill.style.width = share + '%';
+
+    var text = 'Отправлено ' + progress.sent + ' из ' + progress.total;
+    if (progress.failed) text += ' · ошибок ' + progress.failed;
+
+    if (progress.done) {
+      text = progress.cancelled
+        ? 'Остановлено: ' + text.toLowerCase()
+        : 'Готово: ' + text.toLowerCase();
+    }
+
+    el.castProgressText.textContent = text;
+
+    var running = !progress.done;
+    el.castCancel.hidden = !running;
+    el.castSend.disabled = running;
+
+    return running;
+  }
+
+  function pollCast() {
+    clearInterval(castTimer);
+
+    castTimer = setInterval(function () {
+      api('/broadcast')
+        .then(function (body) {
+          if (!renderProgress(body.progress)) {
+            clearInterval(castTimer);
+            castTimer = null;
+            loadCast();
+          }
+        })
+        .catch(function () {
+          clearInterval(castTimer);
+          castTimer = null;
+        });
+    }, CAST_POLL_MS);
+  }
+
+  function loadCast() {
+    updateCastCount();
+
+    return api('/broadcast')
+      .then(function (body) {
+        recipients = body.recipients.total;
+
+        var warn = recipients
+          ? 'Будет отправлено ' + usersDative(recipients) +
+            ' (Telegram ' + body.recipients.tg + ' · MAX ' + body.recipients.max + ').'
+          : 'Получателей пока нет: список наполняется, когда люди пишут /start ' +
+            'боту из .env этого проекта.';
+
+        if (body.recipients.others) {
+          warn += ' Пользователи других ботов (' + body.recipients.others +
+            ') не получат ничего: их чаты знает только тот бот, который их завёл.';
+        }
+
+        el.castWarnText.textContent = warn;
+
+        // Порядок важен: renderProgress тоже трогает кнопку, а последнее
+        // слово должно остаться за «получателей нет — отправлять некому»
+        var running = renderProgress(body.progress);
+
+        el.castSend.disabled = running || !recipients;
+
+        if (running) pollCast();
+      })
+      .catch(function (err) {
+        if (err.message === 'Нужен вход') return;
+        el.castWarnText.textContent = 'Не удалось получить список: ' + err.message;
+      });
+  }
+
+  el.castSend.addEventListener('click', function () {
+    var text = el.castText.value.trim();
+
+    if (!text) {
+      toast('Сообщение пустое', 'error');
+      return;
+    }
+
+    if (!window.confirm('Отправить это сообщение ' + usersDative(recipients) + '?')) return;
+
+    el.castSend.disabled = true;
+
+    post('/broadcast', { text: text })
+      .then(function (body) {
+        toast('Рассылка запущена');
+        if (body.warning) toast('Внимание: ' + body.warning, 'error');
+
+        renderProgress(body.progress);
+        pollCast();
+      })
+      .catch(function (err) {
+        if (err.message !== 'Нужен вход') toast('Ошибка: ' + err.message, 'error');
+        el.castSend.disabled = false;
+      });
+  });
+
+  el.castCancel.addEventListener('click', function () {
+    post('/broadcast/cancel')
+      .then(function (body) {
+        toast('Рассылка останавливается');
+        renderProgress(body.progress);
+      })
+      .catch(function (err) {
+        if (err.message !== 'Нужен вход') toast('Ошибка: ' + err.message, 'error');
+      });
   });
 
   // ---------- Старт ----------
 
   // Спрайт иконок здесь не инлайнится — подтягиваем его файлом
-  ICONS.loadSprite('icons.svg').then(load);
+  ICONS.loadSprite('icons.svg').then(function () {
+    try {
+      var saved = localStorage.getItem(TAB_KEY);
+      if (TABS.indexOf(saved) !== -1) activeTab = saved;
+    } catch (err) {
+      // нет доступа к localStorage — откроем первую вкладку
+    }
+
+    token = readToken();
+
+    if (!token) {
+      showLogin('');
+      return;
+    }
+
+    // Токен есть, но он мог остаться от прежнего запуска сервера.
+    // Проверяем его одним запросом, прежде чем показывать дашборд.
+    api('/stats')
+      .then(function () { showApp(); })
+      .catch(function () { /* 401 уже вернул экран входа */ });
+  });
 })();

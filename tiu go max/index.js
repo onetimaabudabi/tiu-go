@@ -19,6 +19,10 @@ const https = require('https');
 const path = require('path');
 const axios = require('axios');
 
+// Общий список пользователей: из него админка считает статистику
+// и берёт получателей рассылки
+const users = require('../shared/data/users');
+
 // .env лежит в корне проекта, на уровень выше папки "tiu go max"
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -130,6 +134,22 @@ async function handleUpdate(update) {
 
   if (isStartEvent || isStartCommand) {
     console.log('[MAX] /start от пользователя', event.userId || event.chatId);
+
+    // Запоминаем пользователя — но не даём файлу сорвать ответ боту
+    try {
+      // token нужен, чтобы отличить пользователей этого бота от тестового.
+      // В файл он не пишется — только его отпечаток.
+      const result = users.addUser({
+        chatId: event.chatId,
+        userId: event.userId,
+        platform: 'max',
+        token: TOKEN
+      });
+      if (result.added) console.log('[MAX] Новый пользователь · всего', result.total);
+    } catch (err) {
+      console.error('[MAX] Не удалось записать пользователя:', err.message);
+    }
+
     await sendMessage({ chatId: event.chatId, userId: event.userId, text: WELCOME });
     return;
   }

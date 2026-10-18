@@ -8,13 +8,20 @@
  *   GET  /api/health                 — проверка живости сервиса
  *   GET  /                           — мини-приложение из shared/public
  *
- * Админка (только при ADMIN_ENABLED=true в .env):
- *   GET  /admin                      — страница управления лифтами
- *   GET  /api/admin/elevators
- *   POST /api/admin/elevator/:id
- *   POST /api/admin/reset
- *   POST /api/admin/all-working
+ * Админка (нужны ADMIN_USERNAME и ADMIN_PASSWORD в .env):
+ *   GET  /admin                      — страница админки
+ *   POST /api/admin/login            — вход, отдаёт токен сессии
+ *   GET  /api/admin/elevators        — состояние лифтов для формы
+ *   POST /api/admin/elevators/:id    — статус, пояснение и показания лифта
+ *   POST /api/admin/reset            — вернуть случайные значения
+ *   POST /api/admin/all-working      — снять все поломки
+ *   GET  /api/admin/stats            — пользователи и обращения к API
+ *   POST /api/admin/broadcast        — рассылка всем пользователям ботов
+ *   GET  /api/admin/broadcast        — ход текущей рассылки
+ *   POST /api/admin/broadcast/cancel — остановить рассылку
  *   POST /api/admin/test-notification
+ *
+ * Все ручки, кроме /login, требуют заголовок Authorization: Bearer <token>.
  *
  * Вся расчётная логика живёт здесь — фронтенд только отображает:
  * статус кабины, рекомендация, прогноз ожидания диапазоном,
@@ -25,6 +32,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const axios = require('axios');
 
@@ -32,6 +40,8 @@ const axios = require('axios');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const mock = require('./data/mockData');
+const users = require('./data/users');   // список пользователей ботов
+const stats = require('./data/stats');   // счётчик обращений к API
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -976,20 +986,41 @@ function sendTelegram(chatId, text) {
 
 /**
  * Отправка в MAX.
+ *
+ * Получателя принимаем в двух видах: числом (это chat_id, так зовёт
+ * рассылка уведомлений) или объектом {chatId, userId} — в личке бот MAX
+ * видит только отправителя, и тогда адресовать приходится по user_id.
+ *
  * TODO: сверить адрес метода, имя параметра получателя и формат тела
  *       с документацией — https://dev.max.ru/docs
  */
-function sendMax(chatId, text) {
+function sendMax(target, text) {
   const token = process.env.MAX_BOT_TOKEN;
   if (!usableToken(token)) return Promise.resolve(false);
 
+  const params = { access_token: token.trim() };
+  let label;
+
+  if (target && typeof target === 'object') {
+    if (target.chatId !== undefined && target.chatId !== null) {
+      params.chat_id = target.chatId;
+      label = 'chat ' + target.chatId;
+    } else {
+      params.user_id = target.userId;
+      label = 'user ' + target.userId;
+    }
+  } else {
+    params.chat_id = target;
+    label = 'chat ' + target;
+  }
+
   return axios.post('https://botapi.max.ru/messages', { text: text }, {
-    params: { access_token: token.trim(), chat_id: chatId },
+    params: params,
     timeout: 8000
   })
     .then(() => true)
     .catch((err) => {
-      console.error('[push] MAX', chatId, '—', err.message);
+      console.error('[push] MAX', label, '—', err.message);
       return false;
     });
 }
@@ -1170,20 +1201,106 @@ app.use(express.json({ limit: '16kb' }));
 
 // ---------- Админка ----------
 
-/** Админка выключена по умолчанию: это инструмент для демонстрации и тестов. */
+/**
+ * Админка закрыта логином и паролем из .env:
+ *
+ *   ADMIN_USERNAME=admin
+ *   ADMIN_PASSWORD=...
+ *
+ * Пока переменных нет, страницы и ручек просто не существует — 404.
+ * Это важнее удобства: с этой страницы можно переключить статусы лифтов
+ * и разослать сообщение всем пользователям бота.
+ *
+ * ADMIN_ENABLED=false — жёсткий выключатель поверх пароля: на боевом
+ * сервере админку можно убрать совсем, не удаляя логин с паролем.
+ */
+
+const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || '').trim();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
+// Пароль из шаблона .env.example. Запуск с ним не запрещаем — иначе
+// первое знакомство с проектом начиналось бы с ошибки, — но в консоли
+// про это пишем прямо.
+const DEFAULT_ADMIN_PASSWORD = 'change_me_please';
+
+/**
+ * Токен сессии. Генерируется один раз при старте процесса и живёт только
+ * в памяти: перезапуск сервера разлогинивает админку. Так и задумано —
+ * украденный токен перестаёт работать сам, без всякой логики истечения.
+ */
+const ADMIN_TOKEN = crypto.randomBytes(24).toString('hex');
+
+/** Логин и пароль заданы? */
+function adminConfigured() {
+  return ADMIN_USERNAME.length > 0 && ADMIN_PASSWORD.length > 0;
+}
+
+/** Админка доступна? */
 function adminEnabled() {
-  return process.env.ADMIN_ENABLED === 'true';
+  if (process.env.ADMIN_ENABLED === 'false') return false;
+  return adminConfigured();
 }
 
 function adminOff(res) {
   return res.status(404).json({
     success: false,
-    error: 'Админка отключена. Поставьте ADMIN_ENABLED=true в .env и перезапустите сервер.'
+    error: 'Админка недоступна. Задайте ADMIN_USERNAME и ADMIN_PASSWORD в .env ' +
+      'и перезапустите сервер.'
   });
 }
 
-// Страница и её файлы. Проверка стоит ПЕРЕД express.static — иначе статика
-// отдала бы admin.html любому, кто знает имя файла.
+/**
+ * Сравнение секретов за постоянное время. Обычное === выдаёт длину
+ * и первый несовпавший символ через время ответа; для пароля это лишнее.
+ */
+function sameSecret(expected, received) {
+  const left = Buffer.from(String(expected), 'utf8');
+  const right = Buffer.from(String(received), 'utf8');
+
+  // timingSafeEqual требует одинаковую длину, поэтому длину сверяем отдельно.
+  // Её утечка безобидна: подобрать пароль по длине всё равно нельзя.
+  if (left.length !== right.length) return false;
+
+  return crypto.timingSafeEqual(left, right);
+}
+
+// ---------- Защита от перебора пароля ----------
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // окно подсчёта попыток
+const LOGIN_MAX_TRIES = 10;             // столько неудач — и адрес ждёт
+
+// Ключ — req.ip. За обратным прокси (Render, nginx) все запросы приходят
+// с одного адреса, и счётчик фактически становится общим: десять неудач
+// подряд закроют вход на 15 минут для всех. Доверять X-Forwarded-For вместо
+// этого нельзя — заголовок подделывается, и ограничение обходилось бы
+// сменой одной строки в запросе.
+const loginTries = new Map(); // ip -> { count, resetAt }
+
+/** Чистим просроченные записи, чтобы карта не росла бесконечно. */
+function pruneLoginTries(now) {
+  loginTries.forEach((entry, ip) => {
+    if (entry.resetAt <= now) loginTries.delete(ip);
+  });
+}
+
+function loginBlocked(ip, now) {
+  const entry = loginTries.get(ip);
+  return Boolean(entry && entry.resetAt > now && entry.count >= LOGIN_MAX_TRIES);
+}
+
+function noteLoginFail(ip, now) {
+  const entry = loginTries.get(ip);
+
+  if (!entry || entry.resetAt <= now) {
+    loginTries.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    return;
+  }
+
+  entry.count += 1;
+}
+
+/** Страница и её файлы. Проверка стоит ПЕРЕД express.static — иначе статика
+ *  отдала бы admin.html любому, кто знает имя файла. */
 app.use((req, res, next) => {
   if (!/^\/admin(\/|\.|$)/.test(req.path)) return next();
   if (!adminEnabled()) return adminOff(res);
@@ -1204,6 +1321,66 @@ app.use('/api/admin', (req, res, next) => {
 // Статика мини-приложения
 app.use(express.static(path.join(__dirname, 'public')));
 
+/**
+ * Вход. Отвечает токеном, который фронтенд кладёт в localStorage
+ * и присылает в заголовке Authorization: Bearer <token>.
+ *
+ * Зарегистрирован ДО проверки токена ниже — иначе войти было бы нельзя.
+ */
+app.post('/api/admin/login', (req, res) => {
+  const now = Date.now();
+  const ip = req.ip || 'unknown';
+
+  pruneLoginTries(now);
+
+  if (loginBlocked(ip, now)) {
+    console.warn('[admin] Слишком много попыток входа с', ip);
+    return res.status(429).json({
+      success: false,
+      error: 'Слишком много попыток. Попробуйте через 15 минут.'
+    });
+  }
+
+  const body = req.body || {};
+  const username = typeof body.username === 'string' ? body.username.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  // Обе проверки выполняем всегда, даже если первая уже провалилась:
+  // иначе время ответа подсказывало бы, верен ли логин.
+  const userOk = sameSecret(ADMIN_USERNAME, username);
+  const passOk = sameSecret(ADMIN_PASSWORD, password);
+
+  if (!userOk || !passOk) {
+    noteLoginFail(ip, now);
+    console.warn('[admin] Неудачный вход с', ip);
+    return res.status(401).json({ success: false, error: 'Неверный логин или пароль' });
+  }
+
+  loginTries.delete(ip);
+  console.log('[admin] Вход выполнен с', ip);
+
+  return res.json({ success: true, token: ADMIN_TOKEN });
+});
+
+/**
+ * Проверка токена для всех остальных ручек /api/admin/*.
+ * Нет заголовка или токен чужой — 401, и фронтенд возвращает экран логина.
+ */
+app.use('/api/admin', (req, res, next) => {
+  if (req.path === '/login') return next();
+
+  const header = req.get('Authorization') || '';
+  const token = header.replace(/^Bearer\s+/i, '').trim();
+
+  if (!token || !sameSecret(ADMIN_TOKEN, token)) {
+    return res.status(401).json({ success: false, error: 'Нужен вход в админку' });
+  }
+
+  return next();
+});
+
+// ---------- Лифты ----------
+
 app.get('/api/admin/elevators', (req, res) => {
   res.json({
     success: true,
@@ -1214,14 +1391,20 @@ app.get('/api/admin/elevators', (req, res) => {
   });
 });
 
-app.post('/api/admin/elevator/:id', (req, res) => {
+/** Правка одного лифта: статус, пояснение и «сырые» показания. */
+function updateElevator(req, res) {
   const result = mock.setElevator(req.params.id, req.body || {});
 
   if (!result.ok) return res.status(400).json({ success: false, error: result.error });
 
   console.log('[admin] Лифт', req.params.id, '—', JSON.stringify(req.body || {}));
   res.json({ success: true, elevator: result.elevator });
-});
+}
+
+// Два адреса на один обработчик: /elevators/:id — текущий, /elevator/:id
+// остался от прежней версии админки, чтобы не ломать закладки и скрипты.
+app.post('/api/admin/elevators/:id', updateElevator);
+app.post('/api/admin/elevator/:id', updateElevator);
 
 app.post('/api/admin/reset', (req, res) => {
   console.log('[admin] Сброс к случайным значениям');
@@ -1231,6 +1414,202 @@ app.post('/api/admin/reset', (req, res) => {
 app.post('/api/admin/all-working', (req, res) => {
   console.log('[admin] Все лифты переведены в «работает»');
   res.json({ success: true, elevators: mock.setAllWorking() });
+});
+
+// ---------- Статистика ----------
+
+app.get('/api/admin/stats', (req, res) => {
+  const counts = users.countUsers();
+  const api = stats.snapshot();
+  const elevators = mock.getAdminElevators();
+
+  res.json({
+    success: true,
+    users: counts,
+    api: api,
+    subscriptions: readSubscriptions().length,
+    reports: readReports().length,
+    elevators: {
+      total: elevators.length,
+      working: elevators.filter((lift) => lift.status === 'working').length
+    },
+    uptimeSec: Math.round(process.uptime())
+  });
+});
+
+// ---------- Рассылка ----------
+
+// Пауза между сообщениями. Telegram разрешает боту около 30 сообщений
+// в секунду на всех получателей; 50 мс — это 20 в секунду, с запасом.
+const BROADCAST_DELAY_MS = 50;
+
+// Telegram режет сообщение на 4096 символах — берём с запасом
+const BROADCAST_MAX_LENGTH = 3500;
+
+/** Текущая (или последняя завершённая) рассылка. Живёт в памяти. */
+let broadcastJob = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Состояние рассылки для UI — без текста получателей и прочего лишнего. */
+function broadcastState(job) {
+  if (!job) return null;
+
+  return {
+    id: job.id,
+    total: job.total,
+    sent: job.sent,
+    failed: job.failed,
+    done: job.done,
+    cancelled: job.cancelled,
+    startedAt: new Date(job.startedAt).toISOString(),
+    finishedAt: job.finishedAt ? new Date(job.finishedAt).toISOString() : null
+  };
+}
+
+/** Отправка одному пользователю. Платформу берём из его записи в users.json. */
+function sendToUser(user, text) {
+  if (user.platform === 'max') return sendMax(user, text);
+  return sendTelegram(user.chatId, text);
+}
+
+/**
+ * Проход по получателям. Ошибка на одном человеке (заблокировал бота,
+ * удалил чат, сеть отвалилась) не должна останавливать рассылку и уж тем
+ * более ронять сервер — поэтому каждый вызов обёрнут в try.
+ */
+async function runBroadcast(job) {
+  for (const user of job.recipients) {
+    if (job.cancelled) break;
+
+    try {
+      const ok = await sendToUser(user, job.text);
+      if (ok) job.sent += 1;
+      else job.failed += 1;
+    } catch (err) {
+      // sendTelegram/sendMax ошибки уже глотают, но страховка дешёвая
+      console.error('[admin] Рассылка', user.platform, user.chatId, '—', err.message);
+      job.failed += 1;
+    }
+
+    await sleep(BROADCAST_DELAY_MS);
+  }
+
+  job.done = true;
+  job.finishedAt = Date.now();
+
+  console.log('[admin] Рассылка окончена: доставлено', job.sent,
+    'из', job.total, '· ошибок', job.failed, job.cancelled ? '· остановлена' : '');
+}
+
+/** Запуск рассылки. Отвечает сразу, отправка идёт в фоне. */
+app.post('/api/admin/broadcast', (req, res) => {
+  if (broadcastJob && !broadcastJob.done) {
+    return res.status(409).json({
+      success: false,
+      error: 'Рассылка уже идёт',
+      progress: broadcastState(broadcastJob)
+    });
+  }
+
+  const body = req.body || {};
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+  if (!text) {
+    return res.status(400).json({ success: false, error: 'Текст сообщения пустой' });
+  }
+
+  if (text.length > BROADCAST_MAX_LENGTH) {
+    return res.status(400).json({
+      success: false,
+      error: 'Слишком длинное сообщение: ' + text.length + ' символов из ' +
+        BROADCAST_MAX_LENGTH
+    });
+  }
+
+  // Только пользователи ботов из нашего .env. Отправлять основным ботом
+  // по chatId, которые выдал тестовый, бессмысленно: Telegram такие чаты
+  // не знает, и рассылка собрала бы ошибки на ровном месте.
+  const recipients = users.ownUsers(users.currentTags());
+
+  if (!recipients.length) {
+    return res.status(400).json({
+      success: false,
+      error: 'Получателей нет. Список наполняется, когда люди пишут /start ' +
+        'боту, чей токен стоит в .env этого проекта.'
+    });
+  }
+
+  // Без рабочего токена рассылка молча «отправит» ноль сообщений —
+  // честнее сказать об этом сразу, чем показать 0 из 100.
+  const needTelegram = recipients.some((user) => user.platform !== 'max');
+  const needMax = recipients.some((user) => user.platform === 'max');
+  const hasTelegram = usableToken(process.env.TELEGRAM_BOT_TOKEN);
+  const hasMax = usableToken(process.env.MAX_BOT_TOKEN);
+
+  if ((needTelegram && !hasTelegram) && (needMax && !hasMax)) {
+    return res.status(400).json({
+      success: false,
+      error: 'В .env нет рабочих токенов ботов — отправлять нечем.'
+    });
+  }
+
+  broadcastJob = {
+    id: crypto.randomBytes(6).toString('hex'),
+    text: text,
+    recipients: recipients,
+    total: recipients.length,
+    sent: 0,
+    failed: 0,
+    done: false,
+    cancelled: false,
+    startedAt: Date.now(),
+    finishedAt: null
+  };
+
+  console.log('[admin] Рассылка', broadcastJob.id, '—', recipients.length, 'получателей');
+
+  // Запускаем и не ждём: отправка 100 сообщений по 50 мс займёт пять секунд,
+  // держать на это время HTTP-запрос незачем.
+  runBroadcast(broadcastJob).catch((err) => {
+    console.error('[admin] Рассылка упала целиком:', err.message);
+    broadcastJob.done = true;
+    broadcastJob.finishedAt = Date.now();
+  });
+
+  // Предупреждаем, если часть получателей недостижима из-за токена
+  const warnings = [];
+  if (needTelegram && !hasTelegram) warnings.push('нет TELEGRAM_BOT_TOKEN');
+  if (needMax && !hasMax) warnings.push('нет MAX_BOT_TOKEN');
+
+  res.json({
+    success: true,
+    progress: broadcastState(broadcastJob),
+    warning: warnings.length ? warnings.join(', ') : null
+  });
+});
+
+/** Сколько уже отправлено — фронтенд опрашивает эту ручку раз в секунду. */
+app.get('/api/admin/broadcast', (req, res) => {
+  res.json({
+    success: true,
+    recipients: users.countUsers(),
+    progress: broadcastState(broadcastJob)
+  });
+});
+
+/** Остановить начатую рассылку: дойдёт текущее сообщение и всё. */
+app.post('/api/admin/broadcast/cancel', (req, res) => {
+  if (!broadcastJob || broadcastJob.done) {
+    return res.json({ success: true, progress: broadcastState(broadcastJob) });
+  }
+
+  broadcastJob.cancelled = true;
+  console.log('[admin] Рассылка', broadcastJob.id, '— остановлена вручную');
+
+  res.json({ success: true, progress: broadcastState(broadcastJob) });
 });
 
 /** Тестовое уведомление всем подписчикам — проверить, что рассылка жива. */
@@ -1261,6 +1640,8 @@ app.post('/api/admin/test-notification', (req, res) => {
  * Необязательный параметр ?destination=4 — этаж, куда едет человек.
  */
 app.get('/api/status', (req, res) => {
+  stats.hit(); // счётчик для вкладки «Статистика» в админке
+
   const requested = Math.round(Number(req.query.destination));
   const destination = Number.isFinite(requested) && requested > 0
     ? requested
@@ -1449,6 +1830,7 @@ app.use((req, res) => {
 if (require.main === module) {
   ensureReportsFile();       // чтобы первая жалоба не упала на отсутствующем файле
   ensureSubscriptionsFile(); // то же самое для подписок
+  users.ensureUsersFile();   // и для списка пользователей ботов
 
   // Запускаем симуляцию тестовых данных (обновление каждые 3 секунды)
   mock.startSimulation();
@@ -1465,8 +1847,20 @@ if (require.main === module) {
     console.log(`  API:       http://localhost:${PORT}/api/status`);
     console.log(`  Лифтов:    ${mock.getElevators().length}, обновление раз в ${mock.TICK_MS / 1000} c`);
     console.log(`  Админка:   ${adminEnabled()
-      ? 'http://localhost:' + PORT + '/admin'
-      : 'отключена (ADMIN_ENABLED=true в .env)'}`);
+      ? 'http://localhost:' + PORT + '/admin (вход: ' + ADMIN_USERNAME + ')'
+      : 'недоступна (задайте ADMIN_USERNAME и ADMIN_PASSWORD в .env)'}`);
+    const userCounts = users.countUsers();
+    console.log(`  Пользователей ботов: ${userCounts.total}` +
+      (userCounts.others
+        ? ` (ещё ${userCounts.others} у других ботов — в счёт не идут)`
+        : ''));
+
+    // Пароль из шаблона — не ошибка, но и не пароль. Говорим об этом прямо.
+    if (adminEnabled() && ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD) {
+      console.warn('');
+      console.warn('  ВНИМАНИЕ: ADMIN_PASSWORD в .env остался из шаблона.');
+      console.warn('  Поменяйте его перед тем, как открывать сервер наружу.');
+    }
     console.log(`  Уведомления: проверка раз в ${NOTIFY_INTERVAL_MS / 1000} c, ` +
       `токен Telegram ${usableToken(process.env.TELEGRAM_BOT_TOKEN) ? 'есть' : 'не задан'}, ` +
       `MAX ${usableToken(process.env.MAX_BOT_TOKEN) ? 'есть' : 'не задан'}`);
@@ -1489,6 +1883,8 @@ module.exports = {
   readReports,
   readSubscriptions,
   adminEnabled,
+  adminConfigured,
+  sameSecret,
   isAvailable,
   computeStatus,
   computeRecommendation,

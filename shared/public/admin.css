@@ -1,8 +1,13 @@
 /* ==========================================================================
-   TIU GO — админка лифтов.
+   TIU GO — админ-панель.
    Отдельная страница и отдельные стили: это служебный инструмент,
    он не обязан следовать темам и локализации мини-приложения.
    Тёмная тема одна, шрифт — Inter, если он есть в системе.
+
+   Цвета — те же значения, что в :root мини-приложения (shared/public/style.css).
+   Сам style.css сюда не подключён намеренно: вместе с переменными он принёс бы
+   вёрстку мини-аппа (экраны, таб-бар, стекло) и перебил бы разметку админки.
+   Правите палитру — правьте в двух местах.
    ========================================================================== */
 
 :root {
@@ -14,11 +19,14 @@
   --label-3: #6B7280;
 
   --accent: #5B8DEF;
+  /* Фиолетовый из логотипа (shared/public/logo.svg) — только для акцентов */
+  --accent-2: #4F46E5;
   --ok: #22C55E;
   --busy: #F59E0B;
   --full: #EF4444;
 
   --r: 14px;
+  --r-lg: 20px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -37,7 +45,8 @@ body {
 }
 
 h1, h2, p { margin: 0; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+code { font-size: 0.92em; color: var(--label-2); }
 
 /* Иконки спрайта — те же правила, что и в мини-приложении */
 .icon {
@@ -134,8 +143,8 @@ button, input, select { font: inherit; color: inherit; }
   gap: 10px;
 }
 
-.lift__name { font-size: 16px; font-weight: 600; }
-.lift__meta { font-size: 12px; color: var(--label-3); }
+.lift__name { font-size: 16px; font-weight: 600; white-space: nowrap; }
+.lift__meta { font-size: 12px; text-align: right; color: var(--label-3); }
 
 .lift__frozen {
   align-self: flex-start;
@@ -192,7 +201,14 @@ button, input, select { font: inherit; color: inherit; }
 
 .input:focus { border-color: var(--accent); }
 
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* align-items: end — подпись «Ждут на 1 этаже» в узкой колонке переносится
+   на две строки, и без выравнивания по низу три поля стояли бы лесенкой */
+.nums {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 8px;
+}
 
 /* ── Тост ───────────────────────────────────────────────── */
 .toast {
@@ -212,7 +228,275 @@ button, input, select { font: inherit; color: inherit; }
 .toast[data-tone='error'] { border-color: var(--full); color: var(--full); }
 .toast[data-tone='ok'] { border-color: var(--ok); }
 
+/* ── Экран входа ────────────────────────────────────────── */
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  padding: 8px 0 32px;
+}
+
+.login__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+  padding: 26px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.login__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  color: #FFFFFF;
+}
+
+.login__badge .icon { width: 24px; height: 24px; vertical-align: 0; }
+
+.login__title { font-size: 21px; font-weight: 700; letter-spacing: -0.4px; }
+.login__sub { margin-top: -9px; font-size: 13px; color: var(--label-2); }
+
+.login__error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--full);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.login__note { font-size: 11.5px; line-height: 1.5; color: var(--label-3); }
+
+.btn--wide { width: 100%; justify-content: center; padding: 12px; font-size: 15px; }
+
+/* ── Вкладки дашборда ───────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  max-width: 980px;
+  margin: 0 auto 18px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+.tabs__btn {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 108px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.tabs__btn.is-on {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--label);
+  font-weight: 600;
+}
+
+/* Ряд кнопок над списком лифтов */
+.head__actions--row { max-width: 980px; margin: 0 auto 14px; }
+
+/* ── Статистика ─────────────────────────────────────────── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
+  max-width: 980px;
+  margin: 0 auto 14px;
+}
+
+.metric {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.metric__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--label-3);
+}
+
+.metric__value {
+  margin-top: 8px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric__hint { margin-top: 2px; font-size: 12px; color: var(--label-3); }
+
+.panel {
+  max-width: 980px;
+  margin: 0 auto 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.panel__title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.panel__sub { margin-top: 5px; font-size: 12.5px; line-height: 1.5; color: var(--label-3); }
+
+/* Бар-чарт на CSS: никаких библиотек ради двадцати четырёх столбиков */
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 160px;
+  margin-top: 16px;
+}
+
+.chart__col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+}
+
+.chart__bar {
+  width: 100%;
+  min-height: 3px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, var(--accent), rgba(91, 141, 239, 0.3));
+}
+
+/* Текущий час ещё не закончился — отмечаем его отдельным цветом */
+.chart__col.is-now .chart__bar {
+  background: linear-gradient(180deg, var(--ok), rgba(34, 197, 94, 0.3));
+}
+
+.chart__hour {
+  height: 12px;
+  font-size: 9.5px;
+  color: var(--label-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__empty { margin-top: 16px; font-size: 13px; color: var(--label-3); }
+
+/* ── Рассылка ───────────────────────────────────────────── */
+.cast__area {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cast__area:focus { border-color: var(--accent); }
+
+.cast__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.cast__count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--label-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.warn {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--busy);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.warn .icon { margin-top: 1px; }
+
+.progress { margin-top: 14px; }
+
+.progress__track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progress__fill {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.progress__text {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 520px) {
   body { padding: 18px 14px 48px; }
   .nums { grid-template-columns: 1fr; }
+
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .metric__value { font-size: 24px; }
+
+  /* В две колонки подписи переносятся по-разному, и без запаса высоты
+     большие числа в соседних карточках стояли бы на разных уровнях */
+  .metric__label { min-height: 2.9em; }
+
+  /* На узком экране подписи часов не помещаются — график остаётся,
+     а время читается во всплывающей подсказке столбца */
+  .chart { gap: 2px; height: 130px; }
+  .chart__hour { display: none; }
+
+  .tabs__btn { min-width: 96px; font-size: 13px; }
+  .head__actions--row .btn { flex: 1 1 140px; justify-content: center; }
 }

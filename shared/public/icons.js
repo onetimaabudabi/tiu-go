@@ -45,7 +45,10 @@
 
     'heart-hands', 'external-link',
 
-    'news', 'construction'
+    'news', 'construction',
+
+    // Только для админки (shared/public/admin.html)
+    'lock', 'logout', 'send', 'chart'
   ];
 
   /**
