@@ -41,8 +41,6 @@ const SKIP_ANYWHERE = ['node_modules', '.git', '.DS_Store'];
 const SKIP = [
   '.env',
   '.env.example',   // переписываем сами, вычистив секреты
-  'shared/data/users.json',
-  'shared/data/stats.json',
   'shared/data/subscriptions.json',
   'shared/data/history.json',
   'shared/data/reports.json',
@@ -91,7 +89,7 @@ fs.cpSync(SOURCE, TARGET, { recursive: true, filter: allowed });
 // теряется, а пользователи тестовых прогонов попадают в статистику основного
 // бота. Поэтому все секреты здесь вычищаются принудительно.
 
-const SECRETS = ['TELEGRAM_BOT_TOKEN', 'MAX_BOT_TOKEN', 'ADMIN_PASSWORD'];
+const SECRETS = ['TELEGRAM_BOT_TOKEN', 'MAX_BOT_TOKEN', 'ADMIN_PASSWORD', 'UPSTASH_REDIS_REST_TOKEN'];
 
 const HEADER = [
   '# Настройки ТЕСТОВОЙ копии TIU GO.',

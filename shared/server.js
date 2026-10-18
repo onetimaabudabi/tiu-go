@@ -8,7 +8,7 @@
  *   GET  /api/health                 — проверка живости сервиса
  *   GET  /                           — мини-приложение из shared/public
  *
- * Админка (нужны ADMIN_USERNAME и ADMIN_PASSWORD в .env):
+ * Админка (нужны переменные ADMIN_USERNAME и ADMIN_PASSWORD):
  *   GET  /admin                      — страница админки
  *   POST /api/admin/login            — вход, отдаёт токен сессии
  *   GET  /api/admin/elevators        — состояние лифтов для формы
@@ -16,6 +16,7 @@
  *   POST /api/admin/reset            — вернуть случайные значения
  *   POST /api/admin/all-working      — снять все поломки
  *   GET  /api/admin/stats            — пользователи и обращения к API
+ *   GET  /api/admin/reports          — жалобы на лифты из мини-аппа
  *   POST /api/admin/broadcast        — рассылка всем пользователям ботов
  *   GET  /api/admin/broadcast        — ход текущей рассылки
  *   POST /api/admin/broadcast/cancel — остановить рассылку
@@ -40,8 +41,13 @@ const axios = require('axios');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const mock = require('./data/mockData');
-const users = require('./data/users');   // список пользователей ботов
-const stats = require('./data/stats');   // счётчик обращений к API
+
+// Хранилище. На Render диск эфемерный и у каждого сервиса свой, поэтому
+// пользователи, счётчики и статусы лифтов живут в Redis, а не в файлах.
+const db = require('./db/redis');
+const users = require('./db/users');          // пользователи ботов
+const stats = require('./db/stats');          // счётчик обращений к API
+const elevatorStore = require('./db/elevators'); // статусы работы лифтов
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1187,6 +1193,29 @@ function startNotifications() {
   return timer;
 }
 
+// ---------- Статусы лифтов из базы в симуляцию ----------
+
+/**
+ * Переносит сохранённые статусы в mockData.
+ *
+ * Разделение такое: в базе лежит то, что поставил человек (статус работы
+ * и комментарий), в памяти — то, что считает симуляция (этаж, кабина,
+ * очередь). Здесь первое накладывается на второе.
+ *
+ * Числовые поля намеренно не трогаем: setElevator замораживает лифт,
+ * которому выставили цифры руками, и симуляция перестала бы его двигать.
+ */
+function applyElevatorStatuses(statuses) {
+  Object.keys(statuses || {}).forEach((id) => {
+    const record = statuses[id];
+
+    mock.setElevator(id, {
+      status: record.status,
+      statusNote: record.statusNote === null ? '' : record.statusNote
+    });
+  });
+}
+
 // ---------- Middleware ----------
 
 // Мини-апп открывается внутри webview Telegram/MAX — разрешаем кросс-доменные запросы
@@ -1244,7 +1273,8 @@ function adminEnabled() {
 function adminOff(res) {
   return res.status(404).json({
     success: false,
-    error: 'Админка недоступна. Задайте ADMIN_USERNAME и ADMIN_PASSWORD в .env ' +
+    error: 'Админка недоступна. Задайте ADMIN_USERNAME и ADMIN_PASSWORD — ' +
+      'локально в .env, на хостинге в переменных окружения сервиса — ' +
       'и перезапустите сервер.'
   });
 }
@@ -1391,40 +1421,85 @@ app.get('/api/admin/elevators', (req, res) => {
   });
 });
 
-/** Правка одного лифта: статус, пояснение и «сырые» показания. */
-function updateElevator(req, res) {
-  const result = mock.setElevator(req.params.id, req.body || {});
+/**
+ * Правка одного лифта.
+ *
+ * Статус и комментарий уезжают в базу — они должны пережить передеплой.
+ * Числовые поля остаются в памяти симуляции: это мгновенные показания,
+ * хранить которые незачем, а писать их в Redis на каждое изменение —
+ * лишние команды при месячной квоте.
+ */
+async function updateElevator(req, res) {
+  const body = req.body || {};
+
+  if (body.status !== undefined || body.statusNote !== undefined) {
+    const saved = await elevatorStore.updateElevator(
+      req.params.id, body.status, body.statusNote
+    );
+
+    if (!saved.ok) return res.status(400).json({ success: false, error: saved.error });
+  }
+
+  const result = mock.setElevator(req.params.id, body);
 
   if (!result.ok) return res.status(400).json({ success: false, error: result.error });
 
-  console.log('[admin] Лифт', req.params.id, '—', JSON.stringify(req.body || {}));
+  console.log('[admin] Лифт', req.params.id, '—', JSON.stringify(body));
   res.json({ success: true, elevator: result.elevator });
+}
+
+/** Обёртка: ошибку из async-обработчика иначе никто не поймает. */
+function handle(fn) {
+  return (req, res) => {
+    Promise.resolve(fn(req, res)).catch((err) => {
+      console.error('[admin]', req.method, req.path, '—', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+  };
 }
 
 // Два адреса на один обработчик: /elevators/:id — текущий, /elevator/:id
 // остался от прежней версии админки, чтобы не ломать закладки и скрипты.
-app.post('/api/admin/elevators/:id', updateElevator);
-app.post('/api/admin/elevator/:id', updateElevator);
+app.post('/api/admin/elevators/:id', handle(updateElevator));
+app.post('/api/admin/elevator/:id', handle(updateElevator));
 
-app.post('/api/admin/reset', (req, res) => {
+app.post('/api/admin/reset', handle(async (req, res) => {
   console.log('[admin] Сброс к случайным значениям');
-  res.json({ success: true, elevators: mock.resetRandom() });
-});
 
-app.post('/api/admin/all-working', (req, res) => {
+  // Сначала база, потом память: иначе через полминуты обновление кэша
+  // вернуло бы из базы прежние статусы, и кнопка выглядела бы сломанной
+  applyElevatorStatuses(await elevatorStore.resetToDefaults());
+  res.json({ success: true, elevators: mock.resetRandom() });
+}));
+
+app.post('/api/admin/all-working', handle(async (req, res) => {
   console.log('[admin] Все лифты переведены в «работает»');
+
+  applyElevatorStatuses(await elevatorStore.setAllWorking());
   res.json({ success: true, elevators: mock.setAllWorking() });
-});
+}));
 
 // ---------- Статистика ----------
 
-app.get('/api/admin/stats', (req, res) => {
-  const counts = users.countUsers();
-  const api = stats.snapshot();
+app.get('/api/admin/stats', handle(async (req, res) => {
+  // Два обращения к базе разом: ждать их по очереди незачем
+  const [counts, api] = await Promise.all([
+    users.countUsers(),
+    stats.snapshot()
+  ]);
+
   const elevators = mock.getAdminElevators();
 
   res.json({
     success: true,
+
+    // Плоские поля — то, что просит вкладка «Статистика»
+    usersCount: counts.total,
+    totalRequests: api.total,
+    todayRequests: api.today,
+
     users: counts,
     api: api,
     subscriptions: readSubscriptions().length,
@@ -1433,7 +1508,49 @@ app.get('/api/admin/stats', (req, res) => {
       total: elevators.length,
       working: elevators.filter((lift) => lift.status === 'working').length
     },
+    storage: db.isMemory() ? 'memory' : 'redis',
     uptimeSec: Math.round(process.uptime())
+  });
+}));
+
+// ---------- Сообщения о проблемах ----------
+
+// Сколько жалоб отдаём за раз. Их пишет каждый желающий из мини-аппа,
+// так что список растёт сам по себе, а на экране всё равно читают свежие.
+const REPORTS_PAGE = 200;
+
+/**
+ * Жалобы на лифты — те самые, что люди шлют кнопкой «Сообщить о проблеме».
+ *
+ * Отдаём свежие сверху плюс две сводки: по лифтам и по причинам. Сводки
+ * считаются по ВСЕМ жалобам, а не по отданной странице: иначе «лифт 1 —
+ * 12 жалоб» означало бы «12 среди последних двухсот», и цифра врала бы
+ * тем сильнее, чем больше накопилось.
+ */
+app.get('/api/admin/reports', (req, res) => {
+  const all = readReports();
+
+  const byElevator = {};
+  const byReason = {};
+
+  all.forEach((report) => {
+    const id = report.elevatorId;
+    const reason = report.reason || 'other';
+
+    byElevator[id] = (byElevator[id] || 0) + 1;
+    byReason[reason] = (byReason[reason] || 0) + 1;
+  });
+
+  // Файл дописывается в конец, поэтому свежие — в хвосте
+  const recent = all.slice(-REPORTS_PAGE).reverse();
+
+  res.json({
+    success: true,
+    total: all.length,
+    shown: recent.length,
+    reports: recent,
+    byElevator: byElevator,
+    byReason: byReason
   });
 });
 
@@ -1469,10 +1586,22 @@ function broadcastState(job) {
   };
 }
 
-/** Отправка одному пользователю. Платформу берём из его записи в users.json. */
+/**
+ * Отправка одному пользователю. Платформу берём из его записи в базе.
+ *
+ * У MAX идентификатор бывает двух видов: chat_id для групп и user_id
+ * для лички, где бот видит только отправителя. Чем адресовать, бот
+ * записал в поле addressBy — перепутать их значит отправить в пустоту.
+ */
 function sendToUser(user, text) {
-  if (user.platform === 'max') return sendMax(user, text);
-  return sendTelegram(user.chatId, text);
+  if (user.platform !== 'max') return sendTelegram(user.chatId, text);
+
+  return sendMax(
+    user.addressBy === 'user'
+      ? { userId: user.chatId }
+      : { chatId: user.chatId },
+    text
+  );
 }
 
 /**
@@ -1505,7 +1634,7 @@ async function runBroadcast(job) {
 }
 
 /** Запуск рассылки. Отвечает сразу, отправка идёт в фоне. */
-app.post('/api/admin/broadcast', (req, res) => {
+app.post('/api/admin/broadcast', handle(async (req, res) => {
   if (broadcastJob && !broadcastJob.done) {
     return res.status(409).json({
       success: false,
@@ -1532,19 +1661,20 @@ app.post('/api/admin/broadcast', (req, res) => {
   // Только пользователи ботов из нашего .env. Отправлять основным ботом
   // по chatId, которые выдал тестовый, бессмысленно: Telegram такие чаты
   // не знает, и рассылка собрала бы ошибки на ровном месте.
-  const recipients = users.ownUsers(users.currentTags());
+  const recipients = await users.ownUsers(users.currentTags());
 
   if (!recipients.length) {
     return res.status(400).json({
       success: false,
       error: 'Получателей нет. Список наполняется, когда люди пишут /start ' +
-        'боту, чей токен стоит в .env этого проекта.'
+        'боту, чей токен задан для этого сервера.'
     });
   }
 
   // Без рабочего токена рассылка молча «отправит» ноль сообщений —
   // честнее сказать об этом сразу, чем показать 0 из 100.
   const needTelegram = recipients.some((user) => user.platform !== 'max');
+
   const needMax = recipients.some((user) => user.platform === 'max');
   const hasTelegram = usableToken(process.env.TELEGRAM_BOT_TOKEN);
   const hasMax = usableToken(process.env.MAX_BOT_TOKEN);
@@ -1589,16 +1719,16 @@ app.post('/api/admin/broadcast', (req, res) => {
     progress: broadcastState(broadcastJob),
     warning: warnings.length ? warnings.join(', ') : null
   });
-});
+}));
 
 /** Сколько уже отправлено — фронтенд опрашивает эту ручку раз в секунду. */
-app.get('/api/admin/broadcast', (req, res) => {
+app.get('/api/admin/broadcast', handle(async (req, res) => {
   res.json({
     success: true,
-    recipients: users.countUsers(),
+    recipients: await users.countUsers(),
     progress: broadcastState(broadcastJob)
   });
-});
+}));
 
 /** Остановить начатую рассылку: дойдёт текущее сообщение и всё. */
 app.post('/api/admin/broadcast/cancel', (req, res) => {
@@ -1640,7 +1770,9 @@ app.post('/api/admin/test-notification', (req, res) => {
  * Необязательный параметр ?destination=4 — этаж, куда едет человек.
  */
 app.get('/api/status', (req, res) => {
-  stats.hit(); // счётчик для вкладки «Статистика» в админке
+  // Счётчик для вкладки «Статистика». Синхронный: копится в памяти,
+  // в Redis уходит раз в минуту одной командой INCRBY (см. db/stats.js)
+  stats.incrementRequestCount();
 
   const requested = Math.round(Number(req.query.destination));
   const destination = Number.isFinite(requested) && requested > 0
@@ -1825,12 +1957,65 @@ app.use((req, res) => {
 
 // ---------- Старт ----------
 
+/**
+ * Подготовка хранилища: проверяем связь и заводим статусы лифтов,
+ * если база пустая.
+ *
+ * Сервер поднимается даже при недоступной базе — мини-апп должен
+ * показывать лифты, даже когда Redis прилёг. Но в лог об этом пишем
+ * громко: иначе «статистика не копится» выяснится через неделю.
+ */
+async function prepareStorage() {
+  const health = await db.check();
+
+  if (!health.ok) {
+    console.error('[база] Нет связи:', health.error);
+    console.error('[база] Статистика и пользователи сохраняться не будут.');
+    return false;
+  }
+
+  try {
+    const created = await elevatorStore.init();
+    applyElevatorStatuses(elevatorStore.getElevators());
+
+    if (created.length) {
+      console.log('[база] Статусы лифтов заведены впервые:', created.join(', '));
+    }
+  } catch (err) {
+    console.error('[база] Не удалось прочитать статусы лифтов:', err.message);
+    return false;
+  }
+
+  return true;
+}
+
+/** Последний сброс счётчиков перед остановкой: Render шлёт SIGTERM. */
+function installShutdown() {
+  let closing = false;
+
+  const bye = (signal) => {
+    if (closing) return;
+    closing = true;
+
+    console.log(`[${signal}] Останавливаемся, сбрасываем счётчики...`);
+
+    stats.flush()
+      .catch((err) => console.error('[stats] Финальный сброс не удался:', err.message))
+      .then(() => process.exit(0));
+
+    // Если база не отвечает, не висим вечно
+    setTimeout(() => process.exit(0), 3000).unref?.();
+  };
+
+  process.once('SIGTERM', () => bye('SIGTERM'));
+  process.once('SIGINT', () => bye('SIGINT'));
+}
+
 // Поднимаем сервер только при прямом запуске (`npm run start:server`).
 // При обычном require модуль можно использовать в тестах, ничего не занимая.
 if (require.main === module) {
   ensureReportsFile();       // чтобы первая жалоба не упала на отсутствующем файле
   ensureSubscriptionsFile(); // то же самое для подписок
-  users.ensureUsersFile();   // и для списка пользователей ботов
 
   // Запускаем симуляцию тестовых данных (обновление каждые 3 секунды)
   mock.startSimulation();
@@ -1841,32 +2026,58 @@ if (require.main === module) {
   // Рассылка уведомлений раз в 30 секунд
   startNotifications();
 
-  app.listen(PORT, () => {
-    console.log('TIU GO — сервер мини-приложения');
-    console.log(`  Мини-апп:  http://localhost:${PORT}`);
-    console.log(`  API:       http://localhost:${PORT}/api/status`);
-    console.log(`  Лифтов:    ${mock.getElevators().length}, обновление раз в ${mock.TICK_MS / 1000} c`);
-    console.log(`  Админка:   ${adminEnabled()
-      ? 'http://localhost:' + PORT + '/admin (вход: ' + ADMIN_USERNAME + ')'
-      : 'недоступна (задайте ADMIN_USERNAME и ADMIN_PASSWORD в .env)'}`);
-    const userCounts = users.countUsers();
-    console.log(`  Пользователей ботов: ${userCounts.total}` +
-      (userCounts.others
-        ? ` (ещё ${userCounts.others} у других ботов — в счёт не идут)`
-        : ''));
+  // Накопленные счётчики уезжают в базу раз в минуту
+  stats.start();
 
-    // Пароль из шаблона — не ошибка, но и не пароль. Говорим об этом прямо.
-    if (adminEnabled() && ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD) {
-      console.warn('');
-      console.warn('  ВНИМАНИЕ: ADMIN_PASSWORD в .env остался из шаблона.');
-      console.warn('  Поменяйте его перед тем, как открывать сервер наружу.');
-    }
-    console.log(`  Уведомления: проверка раз в ${NOTIFY_INTERVAL_MS / 1000} c, ` +
-      `токен Telegram ${usableToken(process.env.TELEGRAM_BOT_TOKEN) ? 'есть' : 'не задан'}, ` +
-      `MAX ${usableToken(process.env.MAX_BOT_TOKEN) ? 'есть' : 'не задан'}`);
-    console.log('');
-    console.log('  Для ботов укажите в .env публичный HTTPS-адрес этого сервера');
-    console.log('  в переменной WEBAPP_URL (например, туннель ngrok/cloudflared).');
+  // Статусы лифтов перечитываем раз в полминуты: их мог поменять
+  // другой процесс, а узнать об этом неоткуда
+  elevatorStore.start(applyElevatorStatuses);
+
+  installShutdown();
+
+  prepareStorage().then((ready) => {
+    app.listen(PORT, async () => {
+      console.log('TIU GO — сервер мини-приложения');
+      console.log(`  Мини-апп:  http://localhost:${PORT}`);
+      console.log(`  API:       http://localhost:${PORT}/api/status`);
+      console.log(`  Лифтов:    ${mock.getElevators().length}, обновление раз в ${mock.TICK_MS / 1000} c`);
+      console.log(`  Хранилище: ${db.describe()}${ready ? '' : ' — НЕДОСТУПНО'}`);
+      console.log(`  Админка:   ${adminEnabled()
+        ? 'http://localhost:' + PORT + '/admin (вход: ' + ADMIN_USERNAME + ')'
+        : 'недоступна (задайте ADMIN_USERNAME и ADMIN_PASSWORD: локально ' +
+          'в .env, на хостинге — в переменных окружения сервиса)'}`);
+
+      try {
+        const userCounts = await users.countUsers();
+        console.log(`  Пользователей ботов: ${userCounts.total}` +
+          (userCounts.others
+            ? ` (ещё ${userCounts.others} у других ботов — в счёт не идут)`
+            : ''));
+      } catch (err) {
+        console.log(`  Пользователей ботов: не удалось прочитать (${err.message})`);
+      }
+
+      // Пароль из шаблона — не ошибка, но и не пароль. Говорим об этом прямо.
+      if (adminEnabled() && ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD) {
+        console.warn('');
+        console.warn('  ВНИМАНИЕ: ADMIN_PASSWORD остался из шаблона.');
+        console.warn('  Поменяйте его перед тем, как открывать сервер наружу.');
+      }
+
+      if (db.isMemory()) {
+        console.warn('');
+        console.warn(`  ВНИМАНИЕ: ${db.URL_ENV} не задан — данные живут в памяти`);
+        console.warn('  процесса. Для боевого сервера заведите Upstash Redis,');
+        console.warn('  иначе статистика и пользователи пропадут при рестарте.');
+      }
+
+      console.log(`  Уведомления: проверка раз в ${NOTIFY_INTERVAL_MS / 1000} c, ` +
+        `токен Telegram ${usableToken(process.env.TELEGRAM_BOT_TOKEN) ? 'есть' : 'не задан'}, ` +
+        `MAX ${usableToken(process.env.MAX_BOT_TOKEN) ? 'есть' : 'не задан'}`);
+      console.log('');
+      console.log('  Для ботов укажите публичный HTTPS-адрес этого сервера');
+      console.log('  в переменной WEBAPP_URL (например, туннель ngrok/cloudflared).');
+    });
   });
 }
 
@@ -1884,6 +2095,7 @@ module.exports = {
   readSubscriptions,
   adminEnabled,
   adminConfigured,
+  applyElevatorStatuses,
   sameSecret,
   isAvailable,
   computeStatus,

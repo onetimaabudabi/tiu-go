@@ -19,9 +19,10 @@ const https = require('https');
 const path = require('path');
 const axios = require('axios');
 
-// Общий список пользователей: из него админка считает статистику
-// и берёт получателей рассылки
-const users = require('../shared/data/users');
+// Общий список пользователей в Redis: из него админка считает статистику
+// и берёт получателей рассылки. Раньше это был файл, но на Render у бота
+// и у сервера разные диски — список до админки просто не доезжал.
+const users = require('../shared/db/users');
 
 // .env лежит в корне проекта, на уровень выше папки "tiu go max"
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
@@ -135,22 +136,24 @@ async function handleUpdate(update) {
   if (isStartEvent || isStartCommand) {
     console.log('[MAX] /start от пользователя', event.userId || event.chatId);
 
-    // Запоминаем пользователя — но не даём файлу сорвать ответ боту
+    await sendMessage({ chatId: event.chatId, userId: event.userId, text: WELCOME });
+
+    // В личке MAX присылает только отправителя, chat_id бывает пустым —
+    // тогда адресуем по user_id. token в базу не попадает, только отпечаток.
     try {
-      // token нужен, чтобы отличить пользователей этого бота от тестового.
-      // В файл он не пишется — только его отпечаток.
-      const result = users.addUser({
-        chatId: event.chatId,
-        userId: event.userId,
-        platform: 'max',
-        token: TOKEN
-      });
-      if (result.added) console.log('[MAX] Новый пользователь · всего', result.total);
+      const hasChat = event.chatId !== undefined && event.chatId !== null;
+
+      const added = await users.addUser(
+        hasChat ? event.chatId : event.userId,
+        'max',
+        { token: TOKEN, addressBy: hasChat ? 'chat' : 'user' }
+      );
+      if (added) console.log('[MAX] Новый пользователь', event.userId || event.chatId);
     } catch (err) {
+      // Не записали — не повод ронять бота: человек приложение уже получил
       console.error('[MAX] Не удалось записать пользователя:', err.message);
     }
 
-    await sendMessage({ chatId: event.chatId, userId: event.userId, text: WELCOME });
     return;
   }
 

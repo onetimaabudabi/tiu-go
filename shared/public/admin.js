@@ -35,7 +35,18 @@
 
   var STATUS_ORDER = ['working', 'broken', 'maintenance'];
 
-  var TABS = ['lifts', 'stats', 'cast'];
+  var TABS = ['lifts', 'stats', 'reports', 'cast'];
+
+  // Причины жалоб — те же ключи, что шлёт мини-апп (см. report.* в i18n.js).
+  // Незнакомый ключ показываем как есть: лучше сырое значение, чем «Другое»,
+  // за которым не видно, что в мини-аппе появилась новая кнопка.
+  var REASON_LABELS = {
+    broken: 'Не работает',
+    slow: 'Долго едет',
+    noise: 'Шумит / скрипит',
+    dirty: 'Грязно в кабине',
+    other: 'Другое'
+  };
 
   // Как часто обновляем цифры на открытой вкладке «Статистика»
   var STATS_REFRESH_MS = 15000;
@@ -68,6 +79,12 @@
 
     metrics: $('metrics'),
     chart: $('chart'),
+
+    reportsBadge: $('tab-reports-badge'),
+    reportsMetrics: $('reports-metrics'),
+    reportsSub: $('reports-sub'),
+    reportsList: $('reports-list'),
+    reportsRefresh: $('btn-reports-refresh'),
 
     castText: $('cast-text'),
     castSend: $('btn-cast'),
@@ -282,6 +299,8 @@
       statsTimer = setInterval(function () {
         if (!document.hidden) loadStats();
       }, STATS_REFRESH_MS);
+    } else if (activeTab === 'reports') {
+      loadReports();
     } else {
       loadCast();
     }
@@ -473,10 +492,21 @@
       body.elevators.working + ' из ' + body.elevators.total;
 
     // Пользователи тестовых ботов в цифру не входят — но сказать о них надо,
-    // иначе непонятно, почему в users.json записей больше
-    var usersHint = 'Telegram ' + body.users.tg + ' · MAX ' + body.users.max;
+    // иначе непонятно, почему в базе записей больше, чем в цифре
+    var usersHint = 'Telegram ' + body.users.telegram + ' · MAX ' + body.users.max;
     if (body.users.others) {
       usersHint += ' · ещё ' + body.users.others + ' у других ботов';
+    }
+
+    // Счётчик жалоб на кнопке вкладки — чтобы новые было видно,
+    // не открывая её. /stats отдаёт их число заодно
+    el.reportsBadge.textContent = body.reports;
+    el.reportsBadge.hidden = !body.reports;
+
+    // Память вместо Redis — значит, цифры обнулятся при перезапуске.
+    // Молчать об этом нельзя: человек решит, что статистика просто врёт
+    if (body.storage === 'memory') {
+      usersHint += ' · база не подключена';
     }
 
     el.metrics.innerHTML =
@@ -531,6 +561,105 @@
           err.message + '</p>';
       });
   }
+
+  // ---------- Вкладка «Проблемы» ----------
+
+  function reasonLabel(key) {
+    return REASON_LABELS[key] || key;
+  }
+
+  /** «18.10, 14:32» — день и время без года: год на экране жалоб не нужен. */
+  function reportTime(iso) {
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return '';
+
+    var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+
+    return pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + ', ' +
+      pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /** Лифт с наибольшим числом жалоб — его и выносим в сводку. */
+  function worstElevator(byElevator) {
+    var ids = Object.keys(byElevator);
+    if (!ids.length) return null;
+
+    var worst = ids[0];
+    ids.forEach(function (id) {
+      if (byElevator[id] > byElevator[worst]) worst = id;
+    });
+
+    return { id: worst, count: byElevator[worst] };
+  }
+
+  function renderReports(body) {
+    var worst = worstElevator(body.byElevator);
+
+    // Самая частая причина — по ней видно, что именно чинить
+    var reasons = Object.keys(body.byReason).sort(function (a, b) {
+      return body.byReason[b] - body.byReason[a];
+    });
+
+    el.reportsMetrics.innerHTML =
+      metricCard('report', 'Всего сообщений', body.total,
+        body.total ? 'последнее ' + reportTime(body.reports[0].timestamp) : 'пока пусто') +
+      metricCard('elevator', 'Больше всего жалоб',
+        worst ? 'Лифт ' + worst.id : '—',
+        worst ? worst.count + ' из ' + body.total : 'жалоб нет') +
+      metricCard('warning', 'Частая причина',
+        reasons.length ? reasonLabel(reasons[0]) : '—',
+        reasons.length ? body.byReason[reasons[0]] + ' раз' : 'жалоб нет');
+
+    // Счётчик на кнопке вкладки
+    el.reportsBadge.textContent = body.total;
+    el.reportsBadge.hidden = !body.total;
+
+    if (!body.total) {
+      el.reportsList.innerHTML = '<p class="reports__empty">Сообщений о проблемах пока нет. ' +
+        'Они появятся здесь, когда кто-нибудь нажмёт «Сообщить о проблеме» ' +
+        'на экране лифта в мини-аппе.</p>';
+      return;
+    }
+
+    el.reportsSub.textContent = body.shown < body.total
+      ? 'Показаны последние ' + body.shown + ' из ' + body.total + ', новые сверху.'
+      : 'Жалобы из мини-аппа, новые сверху.';
+
+    el.reportsList.innerHTML = body.reports.map(function (report) {
+      var reason = report.reason || 'other';
+
+      return '<article class="report" data-reason="' + escapeHtml(reason) + '">' +
+          '<div class="report__head">' +
+            '<span class="report__lift">Лифт ' + escapeHtml(report.elevatorId) + '</span>' +
+            '<span class="report__reason">' + escapeHtml(reasonLabel(reason)) + '</span>' +
+            '<span class="report__time">' + reportTime(report.timestamp) + '</span>' +
+          '</div>' +
+          '<p class="report__comment">' + escapeHtml(report.comment || '') + '</p>' +
+        '</article>';
+    }).join('');
+  }
+
+  function loadReports() {
+    return api('/reports')
+      .then(renderReports)
+      .catch(function (err) {
+        if (err.message === 'Нужен вход') return;
+        el.reportsList.innerHTML = '<p class="reports__empty">Не удалось загрузить: ' +
+          escapeHtml(err.message) + '</p>';
+      });
+  }
+
+  el.reportsRefresh.addEventListener('click', function () {
+    el.reportsRefresh.disabled = true;
+    loadReports().then(function () { el.reportsRefresh.disabled = false; });
+  });
 
   // ---------- Вкладка «Рассылка» ----------
 
@@ -600,7 +729,7 @@
 
         var warn = recipients
           ? 'Будет отправлено ' + usersDative(recipients) +
-            ' (Telegram ' + body.recipients.tg + ' · MAX ' + body.recipients.max + ').'
+            ' (Telegram ' + body.recipients.telegram + ' · MAX ' + body.recipients.max + ').'
           : 'Получателей пока нет: список наполняется, когда люди пишут /start ' +
             'боту из .env этого проекта.';
 

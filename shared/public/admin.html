@@ -74,6 +74,11 @@
         <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
         Статистика
       </button>
+      <button class="tabs__btn" type="button" data-tab="reports">
+        <svg class="icon" aria-hidden="true"><use href="#icon-report"></use></svg>
+        Проблемы
+        <span class="tabs__badge" id="tab-reports-badge" hidden></span>
+      </button>
       <button class="tabs__btn" type="button" data-tab="cast">
         <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
         Рассылка
@@ -124,12 +129,43 @@
       </div>
 
       <p class="hint">
-        Пользователи считаются по файлу <code>shared/data/users.json</code> — туда
-        боты дописывают каждого, кто отправил <code>/start</code>. В счёт идут
-        только пользователи ботов, чьи токены прописаны в <code>.env</code> этого
-        проекта: у тестового бота токен другой, и его пользователи в цифры
-        не попадают. Счётчик запросов живёт в <code>shared/data/stats.json</code>
-        и переживает перезапуск сервера.
+        Пользователи и счётчики хранятся в Redis — общей базе для сервера
+        и обоих ботов. Туда боты записывают каждого, кто отправил
+        <code>/start</code>. В счёт идут только пользователи ботов, чьи токены
+        заданы этому серверу: у тестового бота токен другой, и его пользователи
+        в цифры не попадают. Цифры переживают перезапуск и передеплой.
+      </p>
+    </section>
+
+    <!-- ── Вкладка «Проблемы» ── -->
+    <section class="tab" id="tab-reports" hidden>
+      <div class="metrics" id="reports-metrics"><!-- сводку строит admin.js --></div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <div>
+            <h2 class="panel__title">
+              <svg class="icon" aria-hidden="true"><use href="#icon-report"></use></svg>
+              Сообщения о проблемах
+            </h2>
+            <p class="panel__sub" id="reports-sub">
+              Жалобы из мини-аппа — кнопка «Сообщить о проблеме» на экране лифта.
+            </p>
+          </div>
+
+          <button class="btn" id="btn-reports-refresh" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+            Обновить
+          </button>
+        </div>
+
+        <div class="reports" id="reports-list"><!-- список строит admin.js --></div>
+      </div>
+
+      <p class="hint">
+        Жалобы лежат в <code>shared/data/reports.json</code> и пишутся туда
+        сервером мини-приложения. Автор не указывается: форма анонимная,
+        логина в мини-аппе нет и привязать жалобу не к кому.
       </p>
     </section>
 
