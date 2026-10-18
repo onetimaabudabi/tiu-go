@@ -15,7 +15,6 @@
  *        attachment типа inline_keyboard с кнопкой типа link).
  */
 const http = require('http');
-const https = require('https');
 const path = require('path');
 const axios = require('axios');
 
@@ -36,8 +35,6 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const TOKEN = process.env.MAX_BOT_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL;
 
-// TODO: уточнить базовый адрес API в документации https://dev.max.ru/docs
-const API_BASE = process.env.MAX_API_BASE || 'https://platform-api2.max.ru';
 
 const POLL_TIMEOUT_SEC = 30; // сколько сервер держит соединение без событий
 const RETRY_DELAY_MS = 5000; // пауза перед повтором после сетевой ошибки
@@ -53,18 +50,13 @@ if (!WEBAPP_URL || !/^https?:\/\//i.test(WEBAPP_URL)) {
   process.exit(1);
 }
 
-// Общий HTTP-клиент: токен MAX передаётся параметром access_token
-// Общий HTTP-клиент: токен MAX передаётся в заголовке Authorization (без Bearer)
-const api = axios.create({
-  baseURL: API_BASE,
-  timeout: (POLL_TIMEOUT_SEC + 15) * 1000,
-  headers: {
-    'Authorization': TOKEN,
-    'Content-Type': 'application/json'
-  },
-  // Временное отключение проверки сертификата для теста
-  httpsAgent: new https.Agent({ rejectUnauthorized: false })
-});
+// Общий клиент Bot API MAX. Адрес, авторизация и формат тела живут
+// в shared/max-api.js — тем же модулем пользуется рассылка на сервере,
+// и разойтись им больше негде.
+const maxApi = require('../shared/max-api');
+
+/** Клиент для long polling: ждёт дольше обычного запроса. */
+const api = maxApi.client((POLL_TIMEOUT_SEC + 15) * 1000);
 
 const WELCOME = [
   'TIU GO — лифты ТИУ под контролем 🛗',
@@ -100,16 +92,11 @@ function openAppAttachment() {
  * TODO: сверить параметры user_id / chat_id с документацией.
  */
 async function sendMessage({ chatId, userId, text }) {
-  const params = {};
-  if (chatId !== undefined && chatId !== null) params.chat_id = chatId;
-  else if (userId !== undefined && userId !== null) params.user_id = userId;
-
-  try {
-    await api.post('/messages', { text, attachments: openAppAttachment() }, { params });
-  } catch (err) {
-    const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-    console.error('[MAX] Не удалось отправить сообщение:', detail);
-  }
+  await maxApi.sendMessage(
+    { chatId: chatId, userId: userId },
+    text,
+    { attachments: openAppAttachment(), timeoutMs: (POLL_TIMEOUT_SEC + 15) * 1000 }
+  );
 }
 
 /**
@@ -224,7 +211,7 @@ async function pollLoop() {
 }
 
 console.log('[MAX] Бот TIU GO запущен.');
-console.log('[MAX] API:', API_BASE);
+console.log('[MAX] API:', maxApi.apiBase());
 console.log('[MAX] Мини-апп:', WEBAPP_URL);
 console.log('[MAX] Напишите боту /start в MAX.');
 

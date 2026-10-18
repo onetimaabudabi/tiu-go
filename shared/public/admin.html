@@ -183,6 +183,41 @@
         <textarea class="cast__area" id="cast-text" maxlength="3500"
                   placeholder="Например: лифт 3 снова работает — ремонт закончен."></textarea>
 
+        <!-- Вложение: либо файл с компьютера, либо ссылка -->
+        <div class="cast__block">
+          <span class="field__label">Вложение — фото или видео</span>
+
+          <div class="cast__media">
+            <label class="btn" for="cast-file">
+              <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+              Выбрать файл
+              <input class="cast__file" id="cast-file" type="file" accept="image/*,video/*" />
+            </label>
+
+            <input class="input cast__url" id="cast-url" type="url"
+                   placeholder="или вставьте ссылку: https://..." />
+
+            <button class="btn" id="btn-cast-clear" type="button" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+              Убрать
+            </button>
+          </div>
+
+          <p class="cast__media-state" id="cast-media-state" hidden></p>
+        </div>
+
+        <!-- Кнопки-ссылки под сообщением -->
+        <div class="cast__block">
+          <span class="field__label">Кнопки под сообщением</span>
+
+          <div class="buttons" id="cast-buttons"><!-- строки добавляет admin.js --></div>
+
+          <button class="btn btn--small" id="btn-button-add" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+            Добавить кнопку
+          </button>
+        </div>
+
         <div class="cast__row">
           <button class="btn btn--accent" id="btn-cast" type="button">
             <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
@@ -213,6 +248,19 @@
         с запасом от лимита Telegram (около 30). Если кто-то заблокировал бота,
         его просто пропускаем и идём дальше: такие получатели попадают в «ошибок».
         Отправка идёт на сервере, страницу можно закрыть.
+      </p>
+
+      <p class="hint">
+        Файл загружается в Telegram один раз — первому получателю, — дальше
+        рассылка шлёт уже его <code>file_id</code>. Сто человек не означают сто
+        загрузок одного ролика. С вложением подпись ограничена 1024 знаками
+        вместо 3500: так устроен Telegram.
+      </p>
+
+      <p class="hint">
+        В MAX уходят текст и кнопки. Вложения туда не отправляются: формат
+        их загрузки в документации MAX не закреплён, а слать вслепую в боевую
+        рассылку нельзя. Если вложение задано ссылкой, она добавляется в текст.
       </p>
     </section>
 

@@ -54,7 +54,13 @@
   // Как часто спрашиваем сервер о ходе рассылки
   var CAST_POLL_MS = 1000;
 
-  var CAST_MAX = 3500; // столько же стоит в server.js (BROADCAST_MAX_LENGTH)
+  // Пределы приходят с сервера вместе со списком получателей — держать
+  // их здесь вторым экземпляром значило бы однажды разойтись с бэкендом
+  var limits = { text: 3500, caption: 1024, buttons: 6, uploadBytes: 20 * 1024 * 1024 };
+
+  // Выбранное вложение: { kind, id } для загруженного файла либо
+  // { kind, url } для ссылки. null — вложения нет
+  var media = null;
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -87,6 +93,12 @@
     reportsRefresh: $('btn-reports-refresh'),
 
     castText: $('cast-text'),
+    castFile: $('cast-file'),
+    castUrl: $('cast-url'),
+    castClear: $('btn-cast-clear'),
+    castMediaState: $('cast-media-state'),
+    castButtons: $('cast-buttons'),
+    buttonAdd: $('btn-button-add'),
     castSend: $('btn-cast'),
     castCancel: $('btn-cast-cancel'),
     castCount: $('cast-count'),
@@ -663,11 +675,151 @@
 
   // ---------- Вкладка «Рассылка» ----------
 
+  /** Предел длины зависит от того, есть ли вложение: подпись короче текста. */
+  function castLimit() {
+    return media ? limits.caption : limits.text;
+  }
+
   function updateCastCount() {
-    el.castCount.textContent = el.castText.value.length + ' / ' + CAST_MAX;
+    var length = el.castText.value.length;
+    var max = castLimit();
+
+    el.castCount.textContent = length + ' / ' + max;
+    el.castCount.style.color = length > max ? 'var(--full)' : '';
+    el.castText.maxLength = max;
   }
 
   el.castText.addEventListener('input', updateCastCount);
+
+  // ---------- Вложение ----------
+
+  function humanSize(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' МБ';
+    return Math.max(1, Math.round(bytes / 1024)) + ' КБ';
+  }
+
+  function showMediaState(message, tone) {
+    el.castMediaState.textContent = message || '';
+    el.castMediaState.hidden = !message;
+    el.castMediaState.dataset.tone = tone || 'ok';
+    el.castClear.hidden = !media;
+  }
+
+  function clearMedia() {
+    media = null;
+    el.castFile.value = '';
+    el.castUrl.value = '';
+    showMediaState('');
+    updateCastCount();
+  }
+
+  el.castClear.addEventListener('click', clearMedia);
+
+  /** Ссылка вместо файла: грузить ничего не надо, Telegram заберёт сам. */
+  el.castUrl.addEventListener('input', function () {
+    var url = el.castUrl.value.trim();
+
+    if (!url) {
+      if (media && media.url) clearMedia();
+      return;
+    }
+
+    el.castFile.value = '';
+
+    // Тип определяем по расширению — спросить сервер по ту сторону ссылки
+    // мы не можем, а Telegram разные методы для фото и видео
+    var kind = /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(url) ? 'video' : 'photo';
+
+    media = { kind: kind, url: url };
+    showMediaState('Ссылка: ' + (kind === 'video' ? 'видео' : 'фото'));
+    updateCastCount();
+  });
+
+  el.castFile.addEventListener('change', function () {
+    var file = el.castFile.files && el.castFile.files[0];
+    if (!file) return;
+
+    if (file.size > limits.uploadBytes) {
+      el.castFile.value = '';
+      showMediaState('Файл слишком большой: ' + humanSize(file.size) +
+        ' при пределе ' + humanSize(limits.uploadBytes), 'error');
+      return;
+    }
+
+    el.castUrl.value = '';
+    showMediaState('Загружаю ' + file.name + ' (' + humanSize(file.size) + ')...');
+
+    // Шлём сырые байты: разбирать multipart на сервере ради одного файла
+    // незачем, а тип и имя помещаются в заголовки
+    fetch('api/admin/upload', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-File-Name': encodeURIComponent(file.name).replace(/%20/g, ' ')
+      },
+      body: file
+    })
+      .then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok || body.success === false) {
+            throw new Error(body.error || 'HTTP ' + res.status);
+          }
+          return body;
+        });
+      })
+      .then(function (body) {
+        media = { kind: body.kind, id: body.id };
+        showMediaState((body.kind === 'video' ? 'Видео' : 'Фото') + ': ' +
+          file.name + ' · ' + humanSize(body.size));
+        updateCastCount();
+      })
+      .catch(function (err) {
+        el.castFile.value = '';
+        media = null;
+        showMediaState('Не удалось загрузить: ' + err.message, 'error');
+        updateCastCount();
+      });
+  });
+
+  // ---------- Кнопки под сообщением ----------
+
+  function addButtonRow(text, url) {
+    if (el.castButtons.children.length >= limits.buttons) {
+      toast('Больше ' + limits.buttons + ' кнопок Telegram не покажет', 'error');
+      return;
+    }
+
+    var row = document.createElement('div');
+    row.className = 'buttons__row';
+
+    row.innerHTML = '' +
+      '<input class="input" data-button="text" type="text" maxlength="64" ' +
+        'placeholder="Подпись" value="' + escapeHtml(text || '') + '" />' +
+      '<input class="input" data-button="url" type="url" ' +
+        'placeholder="https://..." value="' + escapeHtml(url || '') + '" />' +
+      '<button class="buttons__drop" type="button" data-button-remove ' +
+        'title="Убрать кнопку">' + ICONS.icon('close') + '</button>';
+
+    el.castButtons.appendChild(row);
+  }
+
+  el.buttonAdd.addEventListener('click', function () { addButtonRow(); });
+
+  el.castButtons.addEventListener('click', function (event) {
+    var remove = event.target.closest('[data-button-remove]');
+    if (remove) remove.closest('.buttons__row').remove();
+  });
+
+  /** Собирает кнопки из формы; пустые строки просто пропускаются. */
+  function collectButtons() {
+    return Array.prototype.map.call(el.castButtons.children, function (row) {
+      return {
+        text: row.querySelector('[data-button="text"]').value.trim(),
+        url: row.querySelector('[data-button="url"]').value.trim()
+      };
+    }).filter(function (item) { return item.text || item.url; });
+  }
 
   /** Показывает ход рассылки; возвращает true, пока она не закончилась. */
   function renderProgress(progress) {
@@ -685,6 +837,8 @@
 
     var text = 'Отправлено ' + progress.sent + ' из ' + progress.total;
     if (progress.failed) text += ' · ошибок ' + progress.failed;
+    if (progress.media) text += ' · ' + (progress.media === 'video' ? 'видео' : 'фото');
+    if (progress.buttons) text += ' · кнопок ' + progress.buttons;
 
     if (progress.done) {
       text = progress.cancelled
@@ -726,6 +880,8 @@
     return api('/broadcast')
       .then(function (body) {
         recipients = body.recipients.total;
+        if (body.limits) limits = body.limits;
+        updateCastCount();
 
         var warn = recipients
           ? 'Будет отправлено ' + usersDative(recipients) +
@@ -756,20 +912,45 @@
 
   el.castSend.addEventListener('click', function () {
     var text = el.castText.value.trim();
+    var buttons = collectButtons();
 
-    if (!text) {
+    // С вложением текст необязателен: фото без подписи — нормальное сообщение
+    if (!text && !media) {
       toast('Сообщение пустое', 'error');
       return;
     }
 
-    if (!window.confirm('Отправить это сообщение ' + usersDative(recipients) + '?')) return;
+    if (text.length > castLimit()) {
+      toast('Текст длиннее ' + castLimit() + ' знаков', 'error');
+      return;
+    }
+
+    var what = media
+      ? (media.kind === 'video' ? 'видео' : 'фото') + (text ? ' с подписью' : '')
+      : 'сообщение';
+
+    if (buttons.length) what += ' и кнопок: ' + buttons.length;
+
+    if (!window.confirm('Отправить ' + what + ' ' + usersDative(recipients) + '?')) return;
 
     el.castSend.disabled = true;
 
-    post('/broadcast', { text: text })
+    var payload = { text: text, buttons: buttons };
+
+    if (media && media.id) payload.mediaId = media.id;
+    if (media && media.url) {
+      payload.mediaUrl = media.url;
+      payload.mediaKind = media.kind;
+    }
+
+    post('/broadcast', payload)
       .then(function (body) {
         toast('Рассылка запущена');
         if (body.warning) toast('Внимание: ' + body.warning, 'error');
+
+        // Байты уже уехали в задание, и сервер их у себя удалил.
+        // Повторная отправка тем же id не прошла бы — сбрасываем форму
+        if (media && media.id) clearMedia();
 
         renderProgress(body.progress);
         pollCast();

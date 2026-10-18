@@ -49,6 +49,9 @@ const users = require('./db/users');          // пользователи бот
 const stats = require('./db/stats');          // счётчик обращений к API
 const elevatorStore = require('./db/elevators'); // статусы работы лифтов
 
+// Общий клиент Bot API мессенджера MAX — им же пользуется бот
+const maxApi = require('./max-api');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -973,67 +976,147 @@ function usableToken(value) {
   return typeof value === 'string' && value.trim().length > 10 && !/\s/.test(value.trim());
 }
 
-/** Отправка в Telegram через Bot API. */
-function sendTelegram(chatId, text) {
+/**
+ * Отправка в Telegram через Bot API.
+ *
+ * Умеет три вида сообщений: текст, фото с подписью и видео с подписью,
+ * и к любому из них — кнопки-ссылки под сообщением.
+ *
+ * @param {number|string} chatId
+ * @param {string} text — текст сообщения или подпись к вложению
+ * @param {{buttons?: Array<{text: string, url: string}>,
+ *          media?: {kind: 'photo'|'video', url?: string, fileId?: string,
+ *                   buffer?: Buffer, mime?: string, name?: string}}} [options]
+ * @returns {Promise<{ok: boolean, fileId?: string, error?: string}>}
+ */
+async function sendTelegram(chatId, text, options) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!usableToken(token)) return Promise.resolve(false);
+  if (!usableToken(token)) return { ok: false, error: 'нет токена' };
 
-  return axios.post('https://api.telegram.org/bot' + token.trim() + '/sendMessage', {
-    chat_id: chatId,
-    text: text,
-    disable_notification: false
-  }, { timeout: 8000 })
-    .then(() => true)
-    .catch((err) => {
-      console.error('[push] Telegram', chatId, '—', err.message);
-      return false;
-    });
+  const opts = options || {};
+  const media = opts.media || null;
+  // Адрес API можно подменить переменной TELEGRAM_API_BASE — это нужно,
+  // чтобы проверять формат запросов локальным перехватчиком, не отправляя
+  // ничего живым людям
+  const apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org';
+  const base = apiBase.replace(/\/$/, '') + '/bot' + token.trim() + '/';
+
+  // Текст у сообщения с вложением зовётся caption и ограничен жёстче —
+  // 1024 знака против 4096. Проверку делает вызывающий код, здесь просто
+  // кладём в нужное поле
+  const fields = { chat_id: chatId, disable_notification: false };
+
+  const markup = telegramButtons(opts.buttons);
+  if (markup) fields.reply_markup = markup;
+
+  let method = 'sendMessage';
+
+  if (media) {
+    method = media.kind === 'video' ? 'sendVideo' : 'sendPhoto';
+    if (text) fields.caption = text;
+  } else {
+    fields.text = text;
+  }
+
+  try {
+    // Файл, загруженный админом, уходит multipart'ом. Телеграм в ответе
+    // даёт file_id — дальше по списку шлём уже его, а не байты заново:
+    // сто получателей иначе означали бы сто загрузок одного и того же
+    const response = (media && media.buffer && !media.fileId)
+      ? await postMultipart(base + method, fields, media)
+      : await axios.post(base + method, withMediaField(fields, media), { timeout: 20000 });
+
+    return { ok: true, fileId: extractFileId(response.data, media) };
+  } catch (err) {
+    const detail = err.response && err.response.data
+      ? (err.response.data.description || JSON.stringify(err.response.data))
+      : err.message;
+
+    console.error('[push] Telegram', chatId, '—', detail);
+    return { ok: false, error: detail };
+  }
+}
+
+/** Кнопки-ссылки: каждая своей строкой, длинные подписи в ряд не помещаются. */
+function telegramButtons(buttons) {
+  const rows = (buttons || [])
+    .filter((item) => item && item.text && item.url)
+    .map((item) => [{ text: String(item.text), url: String(item.url) }]);
+
+  return rows.length ? { inline_keyboard: rows } : null;
+}
+
+/** Подставляет вложение в поле photo/video — ссылкой или уже известным file_id. */
+function withMediaField(fields, media) {
+  if (!media) return fields;
+
+  const value = media.fileId || media.url;
+  if (!value) return fields;
+
+  return Object.assign({}, fields, { [media.kind === 'video' ? 'video' : 'photo']: value });
 }
 
 /**
- * Отправка в MAX.
- *
- * Получателя принимаем в двух видах: числом (это chat_id, так зовёт
- * рассылка уведомлений) или объектом {chatId, userId} — в личке бот MAX
- * видит только отправителя, и тогда адресовать приходится по user_id.
- *
- * TODO: сверить адрес метода, имя параметра получателя и формат тела
- *       с документацией — https://dev.max.ru/docs
+ * Загрузка файла. FormData и Blob встроены в Node с 18-й версии,
+ * отдельной библиотеки для multipart не нужно.
  */
-function sendMax(target, text) {
-  const token = process.env.MAX_BOT_TOKEN;
-  if (!usableToken(token)) return Promise.resolve(false);
+function postMultipart(url, fields, media) {
+  const form = new FormData();
 
-  const params = { access_token: token.trim() };
-  let label;
+  Object.keys(fields).forEach((key) => {
+    const value = fields[key];
+    form.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+  });
 
-  if (target && typeof target === 'object') {
-    if (target.chatId !== undefined && target.chatId !== null) {
-      params.chat_id = target.chatId;
-      label = 'chat ' + target.chatId;
-    } else {
-      params.user_id = target.userId;
-      label = 'user ' + target.userId;
-    }
-  } else {
-    params.chat_id = target;
-    label = 'chat ' + target;
-  }
+  form.append(
+    media.kind === 'video' ? 'video' : 'photo',
+    new Blob([media.buffer], { type: media.mime || 'application/octet-stream' }),
+    media.name || (media.kind === 'video' ? 'video.mp4' : 'photo.jpg')
+  );
 
-  return axios.post('https://botapi.max.ru/messages', { text: text }, {
-    params: params,
-    timeout: 8000
-  })
-    .then(() => true)
-    .catch((err) => {
-      console.error('[push] MAX', label, '—', err.message);
-      return false;
-    });
+  // Загрузка идёт дольше обычного запроса: видео на 20 МБ по слабому
+  // каналу в восемь секунд не уложится
+  return axios.post(url, form, { timeout: 120000 });
 }
 
+/** file_id из ответа — чтобы следующим получателям не загружать файл заново. */
+function extractFileId(data, media) {
+  if (!media || !data || !data.result) return undefined;
+
+  if (media.kind === 'video') {
+    return data.result.video && data.result.video.file_id;
+  }
+
+  // У фото Telegram отдаёт несколько размеров; последний — самый большой
+  const sizes = data.result.photo;
+  return Array.isArray(sizes) && sizes.length ? sizes[sizes.length - 1].file_id : undefined;
+}
+
+/**
+ * Отправка в MAX — через общий клиент shared/max-api.js.
+ *
+ * Раньше здесь был свой axios со своим адресом и своей авторизацией,
+ * и он расходился с тем, чем пользуется бот: бот слал на platform-api2
+ * с токеном в заголовке, а это — на botapi с токеном в query. Бот работал,
+ * рассылка молча не доходила. Теперь схема одна на всех.
+ *
+ * @param {object|number} target — {chatId} / {userId} / chat_id числом
+ * @param {string} text
+ * @param {{buttons?: Array}} [options]
+ */
+function sendMax(target, text, options) {
+  return maxApi.sendMessage(target, text, Object.assign({ timeoutMs: 8000 }, options));
+}
+
+/**
+ * Push-уведомление подписчику. Отдаёт именно boolean: вызывающий код
+ * считает доставленные через filter(Boolean), а объект результата
+ * оказался бы истинным даже при неудаче.
+ */
 function sendPush(subscription, text) {
   if (subscription.platform === 'max') return sendMax(subscription.chatId, text);
-  return sendTelegram(subscription.chatId, text);
+
+  return sendTelegram(subscription.chatId, text).then((result) => result.ok);
 }
 
 // Когда в последний раз отправляли уведомление данного типа данному человеку.
@@ -1576,6 +1659,8 @@ function broadcastState(job) {
 
   return {
     id: job.id,
+    media: job.media ? job.media.kind : null,
+    buttons: (job.buttons || []).length,
     total: job.total,
     sent: job.sent,
     failed: job.failed,
@@ -1593,15 +1678,27 @@ function broadcastState(job) {
  * для лички, где бот видит только отправителя. Чем адресовать, бот
  * записал в поле addressBy — перепутать их значит отправить в пустоту.
  */
-function sendToUser(user, text) {
-  if (user.platform !== 'max') return sendTelegram(user.chatId, text);
+async function sendToUser(user, text, options) {
+  const opts = options || {};
 
-  return sendMax(
-    user.addressBy === 'user'
-      ? { userId: user.chatId }
-      : { chatId: user.chatId },
-    text
+  if (user.platform !== 'max') {
+    return sendTelegram(user.chatId, text, opts);
+  }
+
+  // Вложения MAX здесь не отправляются: формат их загрузки в документации
+  // не закреплён, а слать вслепую в боевую рассылку нельзя. Ссылку на файл,
+  // если она есть, добавляем в текст — так человек хотя бы сможет открыть.
+  const withLink = opts.media && opts.media.url
+    ? text + '\n\n' + opts.media.url
+    : text;
+
+  const ok = await sendMax(
+    user.addressBy === 'user' ? { userId: user.chatId } : { chatId: user.chatId },
+    withLink,
+    { buttons: opts.buttons }
   );
+
+  return { ok: ok };
 }
 
 /**
@@ -1614,9 +1711,21 @@ async function runBroadcast(job) {
     if (job.cancelled) break;
 
     try {
-      const ok = await sendToUser(user, job.text);
-      if (ok) job.sent += 1;
+      const result = await sendToUser(user, job.text, {
+        buttons: job.buttons,
+        media: job.media
+      });
+
+      if (result.ok) job.sent += 1;
       else job.failed += 1;
+
+      // Первая успешная отправка файла возвращает file_id. Дальше шлём
+      // его вместо байтов: иначе сто получателей означали бы сто загрузок
+      // одного и того же видео
+      if (result.fileId && job.media && !job.media.fileId) {
+        job.media.fileId = result.fileId;
+        console.log('[admin] Вложение загружено, дальше идёт по file_id');
+      }
     } catch (err) {
       // sendTelegram/sendMax ошибки уже глотают, но страховка дешёвая
       console.error('[admin] Рассылка', user.platform, user.chatId, '—', err.message);
@@ -1633,6 +1742,145 @@ async function runBroadcast(job) {
     'из', job.total, '· ошибок', job.failed, job.cancelled ? '· остановлена' : '');
 }
 
+// ---------- Вложения рассылки ----------
+
+// Телеграм принимает до 50 МБ загрузкой, но файл всё это время лежит
+// в памяти процесса, а памяти на Render немного. 20 МБ хватает на фото
+// и короткий ролик.
+const UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+
+// Сколько ждём, пока загруженный файл отправят. Не дождались — выбрасываем,
+// иначе забытые файлы копились бы в памяти до перезапуска.
+const UPLOAD_TTL_MS = 30 * 60 * 1000;
+
+// Подпись к фото и видео у Telegram ограничена жёстче обычного текста
+const CAPTION_MAX_LENGTH = 1024;
+
+const MAX_BUTTONS = 6;
+
+/** Загруженные файлы: id -> { buffer, mime, kind, name, at }. */
+const uploads = new Map();
+
+function pruneUploads(now = Date.now()) {
+  uploads.forEach((item, id) => {
+    if (now - item.at > UPLOAD_TTL_MS) uploads.delete(id);
+  });
+}
+
+/** Фото или видео по типу содержимого; остальное не берём. */
+function mediaKindOf(mime) {
+  if (/^image\//i.test(mime)) return 'photo';
+  if (/^video\//i.test(mime)) return 'video';
+  return null;
+}
+
+/**
+ * Приём файла для рассылки.
+ *
+ * Тело — сырые байты, тип берём из Content-Type. Файл живёт в памяти
+ * процесса и на диск не попадает: на Render диск эфемерный, а файл нужен
+ * ровно на время одной рассылки. Дальше Telegram возвращает file_id,
+ * и байты больше не нужны вовсе.
+ */
+app.post('/api/admin/upload',
+  express.raw({ type: ['image/*', 'video/*'], limit: UPLOAD_MAX_BYTES }),
+  (req, res) => {
+    const mime = (req.get('Content-Type') || '').split(';')[0].trim();
+    const kind = mediaKindOf(mime);
+
+    if (!kind) {
+      return res.status(400).json({
+        success: false,
+        error: 'Можно прикладывать только изображение или видео, получено: ' + (mime || 'ничего')
+      });
+    }
+
+    if (!Buffer.isBuffer(req.body) || !req.body.length) {
+      return res.status(400).json({ success: false, error: 'Пустой файл' });
+    }
+
+    pruneUploads();
+
+    const id = crypto.randomBytes(8).toString('hex');
+    const name = (req.get('X-File-Name') || '').slice(0, 120) ||
+      (kind === 'video' ? 'video.mp4' : 'photo.jpg');
+
+    uploads.set(id, {
+      buffer: req.body,
+      mime: mime,
+      kind: kind,
+      name: name,
+      at: Date.now()
+    });
+
+    console.log('[admin] Файл принят:', kind, Math.round(req.body.length / 1024), 'КБ');
+
+    res.json({ success: true, id: id, kind: kind, size: req.body.length, name: name });
+  });
+
+/** Проверка кнопок. Пустые и с непонятным адресом не пропускаем. */
+function parseButtons(raw) {
+  if (!Array.isArray(raw)) return { ok: true, buttons: [] };
+
+  if (raw.length > MAX_BUTTONS) {
+    return { ok: false, error: 'Слишком много кнопок: ' + raw.length + ' из ' + MAX_BUTTONS };
+  }
+
+  const buttons = [];
+
+  for (const item of raw) {
+    const text = item && typeof item.text === 'string' ? item.text.trim() : '';
+    const url = item && typeof item.url === 'string' ? item.url.trim() : '';
+
+    if (!text && !url) continue; // пустую строку формы просто пропускаем
+
+    if (!text) return { ok: false, error: 'У кнопки нет подписи' };
+
+    // Телеграм отвергает кнопку с некорректной ссылкой и вместе с ней
+    // всё сообщение — лучше поймать это здесь, до рассылки
+    if (!/^https?:\/\//i.test(url)) {
+      return { ok: false, error: 'Ссылка кнопки «' + text + '» должна начинаться с https://' };
+    }
+
+    buttons.push({ text: text.slice(0, 64), url: url });
+  }
+
+  return { ok: true, buttons: buttons };
+}
+
+/** Вложение из тела запроса: загруженный файл или ссылка. */
+function parseMedia(body) {
+  if (body.mediaId) {
+    pruneUploads();
+
+    const file = uploads.get(body.mediaId);
+    if (!file) {
+      return { ok: false, error: 'Файл не найден или устарел — приложите его заново' };
+    }
+
+    return {
+      ok: true,
+      media: {
+        kind: file.kind,
+        buffer: file.buffer,
+        mime: file.mime,
+        name: file.name
+      }
+    };
+  }
+
+  const url = typeof body.mediaUrl === 'string' ? body.mediaUrl.trim() : '';
+  if (!url) return { ok: true, media: null };
+
+  if (!/^https?:\/\//i.test(url)) {
+    return { ok: false, error: 'Ссылка на вложение должна начинаться с https://' };
+  }
+
+  const kind = body.mediaKind === 'video' ? 'video' : 'photo';
+
+  return { ok: true, media: { kind: kind, url: url } };
+}
+
 /** Запуск рассылки. Отвечает сразу, отправка идёт в фоне. */
 app.post('/api/admin/broadcast', handle(async (req, res) => {
   if (broadcastJob && !broadcastJob.done) {
@@ -1646,15 +1894,34 @@ app.post('/api/admin/broadcast', handle(async (req, res) => {
   const body = req.body || {};
   const text = typeof body.text === 'string' ? body.text.trim() : '';
 
-  if (!text) {
+  const parsedMedia = parseMedia(body);
+  if (!parsedMedia.ok) {
+    return res.status(400).json({ success: false, error: parsedMedia.error });
+  }
+
+  const parsedButtons = parseButtons(body.buttons);
+  if (!parsedButtons.ok) {
+    return res.status(400).json({ success: false, error: parsedButtons.error });
+  }
+
+  const media = parsedMedia.media;
+
+  // Без вложения сообщение не может быть пустым. С вложением — может:
+  // картинка без подписи это нормальное сообщение
+  if (!text && !media) {
     return res.status(400).json({ success: false, error: 'Текст сообщения пустой' });
   }
 
-  if (text.length > BROADCAST_MAX_LENGTH) {
+  // У подписи к фото и видео предел втрое ниже, чем у обычного текста.
+  // Поймать это здесь важнее, чем на сотом получателе
+  const limit = media ? CAPTION_MAX_LENGTH : BROADCAST_MAX_LENGTH;
+
+  if (text.length > limit) {
     return res.status(400).json({
       success: false,
-      error: 'Слишком длинное сообщение: ' + text.length + ' символов из ' +
-        BROADCAST_MAX_LENGTH
+      error: media
+        ? 'С вложением подпись ограничена ' + limit + ' знаками, а их ' + text.length
+        : 'Слишком длинное сообщение: ' + text.length + ' символов из ' + limit
     });
   }
 
@@ -1689,6 +1956,8 @@ app.post('/api/admin/broadcast', handle(async (req, res) => {
   broadcastJob = {
     id: crypto.randomBytes(6).toString('hex'),
     text: text,
+    media: media,
+    buttons: parsedButtons.buttons,
     recipients: recipients,
     total: recipients.length,
     sent: 0,
@@ -1699,7 +1968,12 @@ app.post('/api/admin/broadcast', handle(async (req, res) => {
     finishedAt: null
   };
 
-  console.log('[admin] Рассылка', broadcastJob.id, '—', recipients.length, 'получателей');
+  // Байты уже в задании, держать их ещё и в списке загрузок незачем
+  if (body.mediaId) uploads.delete(body.mediaId);
+
+  console.log('[admin] Рассылка', broadcastJob.id, '—', recipients.length, 'получателей',
+    media ? ('· ' + media.kind) : '',
+    parsedButtons.buttons.length ? ('· кнопок ' + parsedButtons.buttons.length) : '');
 
   // Запускаем и не ждём: отправка 100 сообщений по 50 мс займёт пять секунд,
   // держать на это время HTTP-запрос незачем.
@@ -1726,7 +2000,15 @@ app.get('/api/admin/broadcast', handle(async (req, res) => {
   res.json({
     success: true,
     recipients: await users.countUsers(),
-    progress: broadcastState(broadcastJob)
+    progress: broadcastState(broadcastJob),
+
+    // Пределы отдаём сюда, чтобы форма не держала их вторым экземпляром
+    limits: {
+      text: BROADCAST_MAX_LENGTH,
+      caption: CAPTION_MAX_LENGTH,
+      buttons: MAX_BUTTONS,
+      uploadBytes: UPLOAD_MAX_BYTES
+    }
   });
 }));
 
