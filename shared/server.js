@@ -34,7 +34,6 @@
  * Запуск:  npm run start:server
  */
 
-const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
@@ -52,6 +51,9 @@ const users = require('./db/users');          // пользователи бот
 const stats = require('./db/stats');          // счётчик обращений к API
 const elevatorStore = require('./db/elevators'); // статусы работы лифтов
 const support = require('./db/support');      // обращения в поддержку
+const reports = require('./db/reports');      // жалобы на лифты
+const subscriptions = require('./db/subscriptions'); // подписки на уведомления
+const hourlyStore = require('./db/history');  // почасовая копилка для планировщика
 
 // Общий клиент Bot API мессенджера MAX — им же пользуется бот
 const maxApi = require('./max-api');
@@ -78,9 +80,6 @@ const FORECAST_SPREAD = 0.25;
 // и фронтенд передаёт выбор параметром ?destination=
 const DEFAULT_DESTINATION = 1;
 
-// Куда складываем жалобы на лифты и подписки на уведомления
-const REPORTS_FILE = path.join(__dirname, 'data', 'reports.json');
-const SUBSCRIPTIONS_FILE = path.join(__dirname, 'data', 'subscriptions.json');
 
 // ---------- Расписание пиков ----------
 
@@ -370,7 +369,7 @@ function busiestLift(elevators) {
 // лифтов нужны ровно до тех пор, пока по ним считается тренд, и писать
 // их на диск незачем. Для планировщика выхода, которому нужна картина
 // за несколько дней, рядом копятся почасовые средние — они как раз
-// сохраняются (см. HOURLY_FILE).
+// сохраняются в почасовую копилку (shared/db/history.js).
 
 const HISTORY_WINDOW_MS = 30 * 60 * 1000;  // глубина окна наблюдений
 const HISTORY_SAMPLE_MS = 10 * 1000;       // как часто снимаем показания
@@ -556,7 +555,9 @@ function forecastHall(elevators) {
 // видел. Пока наблюдений мало, планировщик так и говорит — считает
 // по расписанию пар, а не по истории.
 
-const HOURLY_FILE = path.join(__dirname, 'data', 'history.json');
+// Копилка живёт в shared/db/history.js: в памяти процесса, а в базу
+// уезжает раз в пять минут. Замер снимается каждые десять секунд,
+// и писать каждый из них в Redis означало бы 8640 команд в сутки.
 
 // Сколько наблюдений в ячейке считаем достаточным, чтобы верить среднему
 const HOURLY_MIN_SAMPLES = 30;
@@ -564,42 +565,6 @@ const HOURLY_MIN_SAMPLES = 30;
 // Потолок счётчика: дальше среднее обновляется скользящим окном и
 // свежие дни постепенно вытесняют старые.
 const HOURLY_MAX_SAMPLES = 20000;
-
-let hourly = null;        // { 'день-час': { samples, waitSum, queueSum } }
-let hourlyDirty = false;
-let hourlySavedAt = 0;
-
-// Чаще раза в минуту на диск не пишем
-const HOURLY_SAVE_MS = 60 * 1000;
-
-function hourlyKey(day, hour) {
-  return day + '-' + hour;
-}
-
-function readHourly() {
-  if (hourly) return hourly;
-
-  try {
-    const raw = JSON.parse(fs.readFileSync(HOURLY_FILE, 'utf8'));
-    hourly = raw && typeof raw === 'object' ? raw : {};
-  } catch (err) {
-    hourly = {};
-  }
-
-  return hourly;
-}
-
-function saveHourly(now = Date.now()) {
-  if (!hourlyDirty || now - hourlySavedAt < HOURLY_SAVE_MS) return;
-
-  try {
-    fs.writeFileSync(HOURLY_FILE, JSON.stringify(hourly), 'utf8');
-    hourlyDirty = false;
-    hourlySavedAt = now;
-  } catch (err) {
-    console.error('[история] не удалось сохранить:', err.message);
-  }
-}
 
 /**
  * Добавляет текущий момент в почасовую копилку.
@@ -615,9 +580,9 @@ function recordHourly(elevators, now = Date.now()) {
   const avgWait = waits.reduce((sum, value) => sum + value, 0) / waits.length;
 
   const date = new Date(now);
-  const key = hourlyKey(date.getDay(), date.getHours());
-  const store = readHourly();
-  const cell = store[key] || { samples: 0, waitSum: 0, queueSum: 0 };
+  const day = date.getDay();
+  const hour = date.getHours();
+  const cell = hourlyStore.cell(day, hour) || { samples: 0, waitSum: 0, queueSum: 0 };
 
   // Переполнение: ужимаем накопленное вдвое, сохраняя среднее
   if (cell.samples >= HOURLY_MAX_SAMPLES) {
@@ -630,9 +595,7 @@ function recordHourly(elevators, now = Date.now()) {
   cell.waitSum += avgWait;
   cell.queueSum += firstFloorQueue(elevators);
 
-  store[key] = cell;
-  hourlyDirty = true;
-  saveHourly(now);
+  hourlyStore.setCell(day, hour, cell);
 }
 
 /**
@@ -640,7 +603,7 @@ function recordHourly(elevators, now = Date.now()) {
  * @returns {{waitTime: number, queue: number, samples: number}|null}
  */
 function hourlyStats(day, hour) {
-  const cell = readHourly()[hourlyKey(day, hour)];
+  const cell = hourlyStore.cell(day, hour);
   if (!cell || cell.samples < HOURLY_MIN_SAMPLES) return null;
 
   return {
@@ -824,50 +787,27 @@ function buildStatus(destination, options) {
 // ---------- Файлы с данными ----------
 
 /** Создаёт файл, если его ещё нет. Пустое значение — валидный JSON. */
-function ensureFile(file, empty) {
-  try {
-    if (!fs.existsSync(file)) fs.writeFileSync(file, empty + '\n', 'utf8');
-  } catch (err) {
-    console.error('[data] Не удалось создать', path.basename(file) + ':', err.message);
-  }
-}
-
-function ensureReportsFile() {
-  ensureFile(REPORTS_FILE, '[]');
-}
-
-function ensureSubscriptionsFile() {
-  ensureFile(SUBSCRIPTIONS_FILE, '[]');
-}
-
-/** Читает массив из JSON-файла; при битом файле начинаем с пустого списка. */
-function readList(file) {
-  try {
-    const list = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return Array.isArray(list) ? list : [];
-  } catch (err) {
-    return [];
-  }
-}
-
-function writeList(file, list) {
-  fs.writeFileSync(file, JSON.stringify(list, null, 2) + '\n', 'utf8');
-}
+/**
+ * Жалобы и подписки переехали в Redis (shared/db/reports.js и
+ * shared/db/subscriptions.js). Обёртки ниже оставлены, чтобы остальной
+ * код и тесты звали их прежними именами.
+ */
 
 function readReports() {
-  return readList(REPORTS_FILE);
+  return reports.getReports();
 }
 
-/** Дописывает отчёт в файл. */
 function saveReport(report) {
-  const list = readReports();
-  list.push(report);
-  writeList(REPORTS_FILE, list);
-  return report;
+  return reports.addReport(report);
 }
 
+/**
+ * Подписки. Синхронная: её зовёт цикл рассылки, и ходить там в сеть
+ * означало бы растягивать цикл на время ответа базы. Список читается
+ * при старте и обновляется раз в две минуты.
+ */
 function readSubscriptions() {
-  return readList(SUBSCRIPTIONS_FILE);
+  return subscriptions.getSubscriptions();
 }
 
 // ---------- Push-уведомления ----------
@@ -1572,10 +1512,11 @@ app.post('/api/admin/all-working', handle(async (req, res) => {
 
 app.get('/api/admin/stats', handle(async (req, res) => {
   // Два обращения к базе разом: ждать их по очереди незачем
-  const [counts, api, supportCounts] = await Promise.all([
+  const [counts, api, supportCounts, reportCount] = await Promise.all([
     users.countUsers(),
     stats.snapshot(),
-    support.countTickets()
+    support.countTickets(),
+    reports.countReports()
   ]);
 
   const elevators = mock.getAdminElevators();
@@ -1590,8 +1531,8 @@ app.get('/api/admin/stats', handle(async (req, res) => {
 
     users: counts,
     api: api,
-    subscriptions: readSubscriptions().length,
-    reports: readReports().length,
+    subscriptions: subscriptions.count(),
+    reports: reportCount,
     supportOpen: supportCounts.open,
     supportTotal: supportCounts.total,
     elevators: {
@@ -1617,8 +1558,8 @@ const REPORTS_PAGE = 200;
  * 12 жалоб» означало бы «12 среди последних двухсот», и цифра врала бы
  * тем сильнее, чем больше накопилось.
  */
-app.get('/api/admin/reports', (req, res) => {
-  const all = readReports();
+app.get('/api/admin/reports', handle(async (req, res) => {
+  const all = await readReports();
 
   const byElevator = {};
   const byReason = {};
@@ -1631,8 +1572,10 @@ app.get('/api/admin/reports', (req, res) => {
     byReason[reason] = (byReason[reason] || 0) + 1;
   });
 
-  // Файл дописывается в конец, поэтому свежие — в хвосте
-  const recent = all.slice(-REPORTS_PAGE).reverse();
+  // getReports() уже отдаёт свежие сверху — берём голову списка.
+  // В файловой версии было наоборот (файл дописывался в конец),
+  // и оставшийся от неё reverse() переворачивал порядок обратно
+  const recent = all.slice(0, REPORTS_PAGE);
 
   res.json({
     success: true,
@@ -1642,7 +1585,7 @@ app.get('/api/admin/reports', (req, res) => {
     byElevator: byElevator,
     byReason: byReason
   });
-});
+}));
 
 // ---------- Рассылка ----------
 
@@ -2343,9 +2286,18 @@ app.post('/api/planner', (req, res) => {
 
 /**
  * Жалоба на лифт: { elevatorId, reason, comment }.
- * Отчёты складываются в shared/data/reports.json.
+ * Жалобы складываются в Redis (shared/db/reports.js).
  */
-app.post('/api/report', (req, res) => {
+app.post('/api/report', handle(async (req, res) => {
+  // Ручка публичная и пишет в базу — ограничиваем так же, как обращения
+  // в поддержку. Иначе один скрипт набьёт её за ночь
+  if (!supportAllowed('report:' + (req.ip || 'unknown'), Date.now())) {
+    return res.status(429).json({
+      success: false,
+      error: 'Слишком много жалоб подряд. Попробуйте позже.'
+    });
+  }
+
   const body = req.body || {};
 
   const elevatorId = Math.round(Number(body.elevatorId));
@@ -2356,30 +2308,23 @@ app.post('/api/report', (req, res) => {
     return res.status(400).json({ success: false, error: 'Нужны elevatorId и reason' });
   }
 
-  const report = {
-    timestamp: new Date().toISOString(),
-    elevatorId,
-    reason: reason.slice(0, 64),
-    comment: comment.slice(0, 500) // длинные комментарии обрезаем
-  };
-
   try {
-    saveReport(report);
+    await saveReport({ elevatorId, reason, comment });
   } catch (err) {
     console.error('[reports] Не удалось сохранить отчёт:', err.message);
     return res.status(500).json({ success: false, error: 'Не удалось сохранить отчёт' });
   }
 
-  console.log('[reports] Лифт', elevatorId, '—', report.reason);
+  console.log('[reports] Лифт', elevatorId, '—', reason);
   return res.json({ success: true });
-});
+}));
 
 /**
  * Подписка на push-уведомления: { chatId, platform, floor, settings, lang }.
  * Повторный вызов с тем же chatId обновляет настройки, а не плодит записи.
- * Подписки лежат в shared/data/subscriptions.json.
+ * Подписки лежат в Redis (shared/db/subscriptions.js).
  */
-app.post('/api/notifications/subscribe', (req, res) => {
+app.post('/api/notifications/subscribe', handle(async (req, res) => {
   const body = req.body || {};
 
   const chatId = typeof body.chatId === 'string' || typeof body.chatId === 'number'
@@ -2421,15 +2366,7 @@ app.post('/api/notifications/subscribe', (req, res) => {
   };
 
   try {
-    const list = readSubscriptions();
-    const at = list.findIndex((item) => (
-      item && String(item.chatId) === chatId && item.platform === platform
-    ));
-
-    if (at === -1) list.push(subscription);
-    else list[at] = subscription;
-
-    writeList(SUBSCRIPTIONS_FILE, list);
+    await subscriptions.saveSubscription(subscription);
   } catch (err) {
     console.error('[push] Не удалось сохранить подписку:', err.message);
     return res.status(500).json({ success: false, error: 'Не удалось сохранить подписку' });
@@ -2439,7 +2376,7 @@ app.post('/api/notifications/subscribe', (req, res) => {
     settings.enabled ? '(включена)' : '(выключена)');
 
   return res.json({ success: true, subscription });
-});
+}));
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -2454,7 +2391,7 @@ app.get('/api/health', (req, res) => {
     storage: db.isMemory() ? 'memory' : 'redis',
     storageNote: db.describe(),
 
-    subscriptions: readSubscriptions().length
+    subscriptions: subscriptions.count()
   });
 });
 
@@ -2489,8 +2426,15 @@ async function prepareStorage() {
     if (created.length) {
       console.log('[база] Статусы лифтов заведены впервые:', created.join(', '));
     }
+
+    // Подписки и копилку наблюдений читаем один раз при старте: дальше
+    // они живут в памяти, а в базу ходят по таймеру
+    await Promise.all([subscriptions.refresh(), hourlyStore.load()]);
+
+    console.log('[база] Подписок:', subscriptions.count(),
+      '· ячеек в копилке наблюдений:', Object.keys(hourlyStore.all()).length);
   } catch (err) {
-    console.error('[база] Не удалось прочитать статусы лифтов:', err.message);
+    console.error('[база] Не удалось прочитать данные:', err.message);
     return false;
   }
 
@@ -2507,9 +2451,10 @@ function installShutdown() {
 
     console.log(`[${signal}] Останавливаемся, сбрасываем счётчики...`);
 
-    stats.flush()
-      .catch((err) => console.error('[stats] Финальный сброс не удался:', err.message))
-      .then(() => process.exit(0));
+    Promise.all([
+      stats.flush().catch((err) => console.error('[stats] Сброс не удался:', err.message)),
+      hourlyStore.flush().catch((err) => console.error('[история] Сброс не удался:', err.message))
+    ]).then(() => process.exit(0));
 
     // Если база не отвечает, не висим вечно
     setTimeout(() => process.exit(0), 3000).unref?.();
@@ -2522,9 +2467,6 @@ function installShutdown() {
 // Поднимаем сервер только при прямом запуске (`npm run start:server`).
 // При обычном require модуль можно использовать в тестах, ничего не занимая.
 if (require.main === module) {
-  ensureReportsFile();       // чтобы первая жалоба не упала на отсутствующем файле
-  ensureSubscriptionsFile(); // то же самое для подписок
-
   // Запускаем симуляцию тестовых данных (обновление каждые 3 секунды)
   mock.startSimulation();
 
@@ -2536,6 +2478,11 @@ if (require.main === module) {
 
   // Накопленные счётчики уезжают в базу раз в минуту
   stats.start();
+
+  // Подписки перечитываем раз в две минуты, копилку наблюдений
+  // сбрасываем раз в пять — почему именно так, написано в этих модулях
+  subscriptions.start();
+  hourlyStore.start();
 
   // Статусы лифтов перечитываем раз в полминуты: их мог поменять
   // другой процесс, а узнать об этом неоткуда
@@ -2598,8 +2545,6 @@ module.exports = {
   PUSH_LANGS,
   peakLabel,
   pushLang,
-  ensureReportsFile,
-  ensureSubscriptionsFile,
   readReports,
   readSubscriptions,
   adminEnabled,

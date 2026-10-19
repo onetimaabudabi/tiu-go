@@ -16,6 +16,7 @@
  * вслепую: ответ ушёл бы по chatId, который прислал кто угодно.
  */
 
+const crypto = require('crypto');
 const { getClient } = require('./redis');
 
 const KEY = 'tiu:support:tickets';
@@ -60,7 +61,10 @@ async function createTicket(chatId, platform, username, message, options) {
   if (!text) throw new Error('Пустое обращение');
 
   const ticket = {
-    id: 't_' + Date.now() + '_' + chatId,
+    // Случайный хвост обязателен: два обращения от одного человека
+    // в одну миллисекунду получили бы одинаковый id, то есть одно поле
+    // хеша, и второе молча затёрло бы первое
+    id: 't_' + Date.now() + '_' + chatId + '_' + crypto.randomBytes(3).toString('hex'),
     chatId: String(chatId),
     platform: normalizePlatform(platform),
     username: clean(username, 64) || 'anonymous',
@@ -90,7 +94,12 @@ async function getTickets() {
   return Object.keys(stored)
     .map((id) => stored[id])
     .filter((ticket) => ticket && typeof ticket === 'object')
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    // При равных метках времени сортируем по id: иначе порядок двух
+    // обращений из одной миллисекунды зависел бы от ответа базы
+    .sort((a, b) => (
+      String(b.createdAt).localeCompare(String(a.createdAt)) ||
+      String(b.id).localeCompare(String(a.id))
+    ));
 }
 
 async function getTicket(id) {
