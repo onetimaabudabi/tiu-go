@@ -109,6 +109,21 @@
       'report.thanks': 'Спасибо! Мы передали информацию',
       'report.error': 'Не удалось отправить. Попробуйте позже',
 
+      // Поддержка
+      'support.open': 'Связаться с поддержкой',
+      'support.title': 'Связаться с поддержкой',
+      'support.text': 'Опишите проблему или задайте вопрос. Мы ответим вам в чате бота.',
+      'support.label': 'Ваше сообщение',
+      'support.placeholder': 'Например: лифт 3 стоит второй день',
+      'support.send': 'Отправить',
+      'support.sending': 'Отправляем…',
+      'support.cancel': 'Отмена',
+      'support.sent': 'Сообщение отправлено! Ожидайте ответа в чате бота',
+      'support.error': 'Не удалось отправить. Попробуйте позже',
+      'support.empty': 'Напишите, что случилось',
+      'support.noChat': 'Ответ придёт в чат бота — откройте приложение из Telegram или MAX',
+
+
       // Сводка по работе лифтов (не по загруженности)
       'summary.working': 'Работают {working} из {total} {word}',
       'status.working': 'Работает',
@@ -376,6 +391,21 @@
       'report.thanks': 'Thanks! We have passed it on',
       'report.error': 'Could not send. Please try again later',
 
+      // Support
+      'support.open': 'Contact support',
+      'support.title': 'Contact support',
+      'support.text': 'Describe the problem or ask a question. We will reply in the bot chat.',
+      'support.label': 'Your message',
+      'support.placeholder': 'For example: elevator 3 has been down for two days',
+      'support.send': 'Send',
+      'support.sending': 'Sending…',
+      'support.cancel': 'Cancel',
+      'support.sent': 'Message sent. Watch for our reply in the bot chat',
+      'support.error': 'Could not send. Please try again later',
+      'support.empty': 'Tell us what happened',
+      'support.noChat': 'The reply arrives in the bot chat — open the app from Telegram or MAX',
+
+
       'summary.working': 'Working: {working} of {total} {word}',
       'status.working': 'Working',
       'status.broken': 'Out of order',
@@ -638,6 +668,21 @@
       'report.close': '关闭',
       'report.thanks': '谢谢！信息已提交',
       'report.error': '发送失败，请稍后重试',
+
+      // 客服
+      'support.open': '联系客服',
+      'support.title': '联系客服',
+      'support.text': '请描述问题或提出疑问，我们会在机器人聊天中回复您。',
+      'support.label': '您的留言',
+      'support.placeholder': '例如：3 号电梯已经停了两天',
+      'support.send': '发送',
+      'support.sending': '发送中…',
+      'support.cancel': '取消',
+      'support.sent': '留言已发送，请留意机器人聊天中的回复',
+      'support.error': '发送失败，请稍后再试',
+      'support.empty': '请描述发生了什么',
+      'support.noChat': '回复会发到机器人聊天中——请从 Telegram 或 MAX 打开应用',
+
 
       'summary.working': '{total} {word}中有 {working} 部在运行',
       'status.working': '运行中',

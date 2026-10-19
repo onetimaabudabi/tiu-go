@@ -48,7 +48,9 @@
     'news', 'construction',
 
     // Только для админки (shared/public/admin.html)
-    'lock', 'logout', 'send', 'chart'
+    'lock', 'logout', 'send', 'chart',
+
+    'support'
   ];
 
   /**

@@ -400,6 +400,11 @@
     <path d="M12.5 16.5V8"/>
     <path d="M16.5 16.5v-6"/>
   </symbol>
+  <symbol id="icon-support" viewBox="0 0 24 24">
+    <path d="M4 14.5v-2.5a8 8 0 0 1 16 0v2.5"/>
+    <path d="M4 14.5h2a1.5 1.5 0 0 1 1.5 1.5v2.5A1.5 1.5 0 0 1 6 20H5.5A1.5 1.5 0 0 1 4 18.5z"/>
+    <path d="M20 14.5h-2a1.5 1.5 0 0 0-1.5 1.5v2.5A1.5 1.5 0 0 0 18 20h.5a1.5 1.5 0 0 0 1.5-1.5z"/>
+  </symbol>
 </svg>
   </div>
 
@@ -1087,6 +1092,15 @@
         <svg class="icon linkrow__go" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
       </a>
 
+      <!-- Связаться с поддержкой: отдельная модалка -->
+      <button class="linkrow" id="support-link" type="button">
+        <span class="linkrow__text">
+          <svg class="icon" aria-hidden="true"><use href="#icon-support"></use></svg>
+          <span data-i18n="support.open">Связаться с поддержкой</span>
+        </span>
+        <svg class="icon linkrow__go" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+      </button>
+
       <!-- О проекте: отдельный экран с приглашением подписаться -->
       <button class="linkrow" id="about-link" type="button">
         <span class="linkrow__text">
@@ -1114,6 +1128,32 @@
               data-i18n="notif.cancel">Закрыть</button>
       <button class="button button--accent" id="notif-save" type="button"
               data-i18n="notif.save">Сохранить</button>
+    </div>
+  </div>
+
+  <!-- ══ Модалка «связаться с поддержкой» ═══════════════ -->
+  <div class="sheet" id="support-sheet" hidden role="dialog" aria-modal="true"
+       aria-labelledby="support-title">
+    <div class="sheet__grabber" aria-hidden="true"></div>
+
+    <h2 class="sheet__title" id="support-title" data-i18n="support.title">
+      Связаться с поддержкой</h2>
+
+    <p class="sheet__hint" data-i18n="support.text">
+      Опишите проблему или задайте вопрос. Мы ответим вам в чате бота.</p>
+
+    <label class="sheet__label" for="support-message" data-i18n="support.label">
+      Ваше сообщение</label>
+    <textarea class="sheet__textarea" id="support-message" rows="4" maxlength="1000"
+              placeholder="Например: лифт 3 стоит второй день"></textarea>
+
+    <p class="sheet__hint" id="support-note" hidden></p>
+
+    <div class="sheet__actions">
+      <button class="button button--ghost" id="support-cancel" type="button"
+              data-i18n="support.cancel">Отмена</button>
+      <button class="button button--accent" id="support-send" type="button"
+              data-i18n="support.send">Отправить</button>
     </div>
   </div>
 

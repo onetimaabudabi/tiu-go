@@ -79,6 +79,11 @@
         Проблемы
         <span class="tabs__badge" id="tab-reports-badge" hidden></span>
       </button>
+      <button class="tabs__btn" type="button" data-tab="support">
+        <svg class="icon" aria-hidden="true"><use href="#icon-support"></use></svg>
+        Поддержка
+        <span class="tabs__badge" id="tab-support-badge" hidden></span>
+      </button>
       <button class="tabs__btn" type="button" data-tab="cast">
         <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
         Рассылка
@@ -166,6 +171,41 @@
         Жалобы лежат в <code>shared/data/reports.json</code> и пишутся туда
         сервером мини-приложения. Автор не указывается: форма анонимная,
         логина в мини-аппе нет и привязать жалобу не к кому.
+      </p>
+    </section>
+
+    <!-- ── Вкладка «Поддержка» ── -->
+    <section class="tab" id="tab-support" hidden>
+      <div class="metrics" id="support-metrics"><!-- сводку строит admin.js --></div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <div>
+            <h2 class="panel__title">
+              <svg class="icon" aria-hidden="true"><use href="#icon-support"></use></svg>
+              Обращения пользователей
+            </h2>
+            <p class="panel__sub" id="support-sub">
+              Вопросы из мини-аппа. Ответ уходит человеку в чат с ботом.
+            </p>
+          </div>
+
+          <button class="btn" id="btn-support-refresh" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+            Обновить
+          </button>
+        </div>
+
+        <div class="tickets" id="support-list"><!-- список строит admin.js --></div>
+      </div>
+
+      <p class="hint">
+        Метка «подтверждён» значит, что Telegram подписал данные пользователя
+        и сервер эту подпись проверил — человек действительно тот, за кого себя
+        выдаёт. Без метки обращение приняли на слово: так бывает, когда
+        приложение открыли в обычном браузере или это MAX, где формат подписи
+        в документации не закреплён. Отвечать на неподтверждённые можно,
+        но ответ уйдёт по тому адресу, который прислал клиент.
       </p>
     </section>
 

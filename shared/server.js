@@ -5,6 +5,7 @@
  *   GET  /api/status                 — состояние всех шести лифтов (JSON)
  *   POST /api/report                 — жалоба на лифт
  *   POST /api/notifications/subscribe — подписка на push-уведомления
+ *   POST /api/support                — обращение в поддержку из мини-аппа
  *   GET  /api/health                 — проверка живости сервиса
  *   GET  /                           — мини-приложение из shared/public
  *
@@ -17,6 +18,8 @@
  *   POST /api/admin/all-working      — снять все поломки
  *   GET  /api/admin/stats            — пользователи и обращения к API
  *   GET  /api/admin/reports          — жалобы на лифты из мини-аппа
+ *   GET  /api/admin/support          — обращения в поддержку
+ *   POST /api/admin/support/:id/reply — ответ на обращение
  *   POST /api/admin/broadcast        — рассылка всем пользователям ботов
  *   GET  /api/admin/broadcast        — ход текущей рассылки
  *   POST /api/admin/broadcast/cancel — остановить рассылку
@@ -48,6 +51,7 @@ const db = require('./db/redis');
 const users = require('./db/users');          // пользователи ботов
 const stats = require('./db/stats');          // счётчик обращений к API
 const elevatorStore = require('./db/elevators'); // статусы работы лифтов
+const support = require('./db/support');      // обращения в поддержку
 
 // Общий клиент Bot API мессенджера MAX — им же пользуется бот
 const maxApi = require('./max-api');
@@ -1568,9 +1572,10 @@ app.post('/api/admin/all-working', handle(async (req, res) => {
 
 app.get('/api/admin/stats', handle(async (req, res) => {
   // Два обращения к базе разом: ждать их по очереди незачем
-  const [counts, api] = await Promise.all([
+  const [counts, api, supportCounts] = await Promise.all([
     users.countUsers(),
-    stats.snapshot()
+    stats.snapshot(),
+    support.countTickets()
   ]);
 
   const elevators = mock.getAdminElevators();
@@ -1587,6 +1592,8 @@ app.get('/api/admin/stats', handle(async (req, res) => {
     api: api,
     subscriptions: readSubscriptions().length,
     reports: readReports().length,
+    supportOpen: supportCounts.open,
+    supportTotal: supportCounts.total,
     elevators: {
       total: elevators.length,
       working: elevators.filter((lift) => lift.status === 'working').length
@@ -2044,6 +2051,218 @@ app.post('/api/admin/test-notification', (req, res) => {
       res.status(500).json({ success: false, error: err.message });
     });
 });
+
+// ---------- Поддержка ----------
+
+/** Сутки: столько Telegram считает initData свежим в своих же примерах. */
+const INITDATA_MAX_AGE_SEC = 24 * 60 * 60;
+
+/**
+ * Проверка подписи initData из Telegram Mini App.
+ *
+ * Зачем. Ручка POST /api/support открыта всему интернету, и chatId в ней
+ * присылает клиент. Без проверки кто угодно отправил бы обращение от имени
+ * чужого chatId — а ответ админа ушёл бы этому человеку. Получился бы
+ * способ слать сообщения любому пользователю бота чужими руками.
+ *
+ * Telegram подписывает initData ключом, выведенным из токена бота, —
+ * и подпись можно проверить, не спрашивая никого. Алгоритм описан
+ * в документации Telegram (Validating data received via the Mini App).
+ *
+ * @returns {{ok: boolean, userId?: string, username?: string, reason?: string}}
+ */
+function verifyTelegramInitData(initData) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!usableToken(botToken)) return { ok: false, reason: 'нет токена бота' };
+  if (typeof initData !== 'string' || !initData) return { ok: false, reason: 'нет initData' };
+
+  let params;
+  try {
+    params = new URLSearchParams(initData);
+  } catch (err) {
+    return { ok: false, reason: 'initData не разбирается' };
+  }
+
+  const hash = params.get('hash');
+  if (!hash) return { ok: false, reason: 'в initData нет подписи' };
+
+  // Строка проверки: все поля кроме hash, по алфавиту, через перевод строки
+  const pairs = [];
+  params.forEach((value, key) => {
+    if (key !== 'hash') pairs.push(key + '=' + value);
+  });
+  pairs.sort();
+
+  const secret = crypto.createHmac('sha256', 'WebAppData')
+    .update(botToken.trim())
+    .digest();
+
+  const expected = crypto.createHmac('sha256', secret)
+    .update(pairs.join('\n'))
+    .digest('hex');
+
+  if (!sameSecret(expected, hash)) return { ok: false, reason: 'подпись не сходится' };
+
+  // Подпись вечна, поэтому отдельно смотрим на возраст: перехваченный
+  // однажды initData иначе работал бы всегда
+  const authDate = Number(params.get('auth_date'));
+  const ageSec = Math.floor(Date.now() / 1000) - authDate;
+
+  if (!Number.isFinite(authDate) || ageSec > INITDATA_MAX_AGE_SEC) {
+    return { ok: false, reason: 'initData устарел' };
+  }
+
+  let user = null;
+  try {
+    user = JSON.parse(params.get('user') || 'null');
+  } catch (err) {
+    user = null;
+  }
+
+  if (!user || !user.id) return { ok: false, reason: 'в initData нет пользователя' };
+
+  return {
+    ok: true,
+    userId: String(user.id),
+    username: user.username || [user.first_name, user.last_name].filter(Boolean).join(' ')
+  };
+}
+
+// Сколько обращений принимаем с одного адреса и за какое время
+const SUPPORT_WINDOW_MS = 10 * 60 * 1000;
+const SUPPORT_MAX_PER_WINDOW = 5;
+
+const supportTries = new Map();
+
+/**
+ * Не частим ли. Ручка публичная и пишет в базу, так что без ограничения
+ * один скрипт набил бы её за ночь — а бесплатный тариф Upstash это 256 МБ
+ * и 500 тысяч команд в месяц.
+ */
+function supportAllowed(ip, now) {
+  supportTries.forEach((entry, key) => {
+    if (entry.resetAt <= now) supportTries.delete(key);
+  });
+
+  const entry = supportTries.get(ip);
+
+  if (!entry || entry.resetAt <= now) {
+    supportTries.set(ip, { count: 1, resetAt: now + SUPPORT_WINDOW_MS });
+    return true;
+  }
+
+  entry.count += 1;
+  return entry.count <= SUPPORT_MAX_PER_WINDOW;
+}
+
+/**
+ * Обращение из мини-аппа.
+ *
+ * Если пришёл initData и подпись сходится — берём chatId оттуда, а не из
+ * тела запроса, и помечаем обращение подтверждённым. Если подписи нет
+ * (мини-апп открыт в обычном браузере, или это MAX, где формат подписи
+ * в документации не закреплён) — принимаем, но отмечаем как неподтверждённое.
+ * Админ видит эту отметку и решает сам.
+ */
+app.post('/api/support', handle(async (req, res) => {
+  const now = Date.now();
+  const ip = req.ip || 'unknown';
+
+  if (!supportAllowed(ip, now)) {
+    return res.status(429).json({
+      success: false,
+      error: 'Слишком много обращений. Попробуйте позже.'
+    });
+  }
+
+  const body = req.body || {};
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+  if (!message) {
+    return res.status(400).json({ success: false, error: 'Сообщение пустое' });
+  }
+
+  if (message.length > support.MESSAGE_MAX) {
+    return res.status(400).json({
+      success: false,
+      error: 'Слишком длинное сообщение: ' + message.length +
+        ' знаков из ' + support.MESSAGE_MAX
+    });
+  }
+
+  const claimedPlatform = body.platform === 'max' ? 'max' : 'telegram';
+  const signed = claimedPlatform === 'telegram'
+    ? verifyTelegramInitData(body.initData)
+    : { ok: false, reason: 'MAX не подписывает initData' };
+
+  // Подтверждённому верим его данным, остальным — тому, что прислали
+  const chatId = signed.ok ? signed.userId : String(body.chatId || '').trim();
+  const username = signed.ok
+    ? signed.username
+    : (typeof body.username === 'string' ? body.username.trim() : '');
+
+  if (!chatId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Не удалось определить, кому отвечать. Откройте приложение из бота.'
+    });
+  }
+
+  const ticket = await support.createTicket(
+    chatId, claimedPlatform, username, message, { verified: signed.ok }
+  );
+
+  console.log('[support] Обращение', ticket.id, 'от', ticket.username,
+    signed.ok ? '(подтверждено)' : '(не подтверждено: ' + signed.reason + ')');
+
+  res.json({ success: true, ticketId: ticket.id });
+}));
+
+/** Список обращений для админки. */
+app.get('/api/admin/support', handle(async (req, res) => {
+  const tickets = await support.getTickets();
+
+  res.json({
+    success: true,
+    tickets: tickets,
+    total: tickets.length,
+    open: tickets.filter((ticket) => ticket.status !== 'replied').length
+  });
+}));
+
+/**
+ * Ответ на обращение. Сначала пишем в базу, потом отправляем человеку.
+ *
+ * Порядок важен: если сначала отправить, а запись потом не удастся,
+ * админ увидит обращение открытым и ответит второй раз.
+ */
+app.post('/api/admin/support/:id/reply', handle(async (req, res) => {
+  const body = req.body || {};
+  const replyText = typeof body.replyText === 'string' ? body.replyText.trim() : '';
+
+  const saved = await support.replyToTicket(req.params.id, replyText);
+  if (!saved.ok) return res.status(400).json({ success: false, error: saved.error });
+
+  const ticket = saved.ticket;
+  const text = 'Ответ от поддержки TIU GO:\n\n' + ticket.replyText;
+
+  const delivered = ticket.platform === 'max'
+    ? await sendMax({ chatId: ticket.chatId }, text)
+    : (await sendTelegram(ticket.chatId, text)).ok;
+
+  console.log('[support] Ответ на', ticket.id, delivered ? 'доставлен' : 'НЕ доставлен');
+
+  // Статус «отвечено» не откатываем: ответ написан и сохранён, а вот
+  // доставка могла не пройти по причинам, которые админу надо показать
+  res.json({
+    success: true,
+    delivered: delivered,
+    ticket: ticket,
+    note: delivered ? null : 'Ответ сохранён, но доставить его не удалось — ' +
+      'человек мог заблокировать бота или ни разу ему не написать'
+  });
+}));
 
 // ---------- API ----------
 

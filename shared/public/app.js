@@ -131,6 +131,13 @@
     // Экран «О проекте»
     about: $('screen-about'),
     aboutLink: $('about-link'),
+
+    supportLink: $('support-link'),
+    supportSheet: $('support-sheet'),
+    supportMessage: $('support-message'),
+    supportNote: $('support-note'),
+    supportSend: $('support-send'),
+    supportCancel: $('support-cancel'),
     aboutHome: $('about-home'),
     aboutAddress: $('about-address'),
     aboutChannel: $('about-channel'),
@@ -276,6 +283,7 @@
     }
 
     el.reportComment.setAttribute('placeholder', t('report.commentPlaceholder'));
+    el.supportMessage.setAttribute('placeholder', t('support.placeholder'));
 
     renderCountdown();
     renderTip(true);   // фраза та же, но на другом языке
@@ -2993,6 +3001,109 @@
   el.aboutChannelButton.addEventListener('click', openChannel);
   el.channelBanner.addEventListener('click', openChannel);
   el.channelFoot.addEventListener('click', openChannel);
+
+  // ---------- Поддержка ----------
+
+  /**
+   * Открывает модалку обращения.
+   *
+   * Если мы вне Telegram и MAX, chatId взять неоткуда — отвечать будет
+   * некуда. Форму всё равно показываем, но честно предупреждаем: человек
+   * может открыть приложение из бота и написать оттуда.
+   */
+  function openSupport() {
+    var chat = hostChat();
+
+    el.supportMessage.value = '';
+    el.supportNote.hidden = Boolean(chat);
+    if (!chat) setText(el.supportNote, t('support.noChat'));
+
+    setText(el.supportSend, t('support.send'));
+    el.supportSend.disabled = false;
+
+    openSheet(el.supportSheet);
+    el.supportMessage.focus();
+  }
+
+  function sendSupport() {
+    var message = el.supportMessage.value.trim();
+
+    if (!message) {
+      showToast(t('support.empty'));
+      return;
+    }
+
+    var chat = hostChat();
+    var tg = tgApp();
+
+    el.supportSend.disabled = true;
+    setText(el.supportSend, t('support.sending'));
+
+    // initData отдаём как есть: сервер проверяет подпись сам и берёт
+    // chatId оттуда. Поля ниже — запасной путь для браузера и MAX,
+    // и там обращение помечается неподтверждённым
+    fetch('api/support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        initData: (tg && tg.initData) || '',
+        chatId: chat ? chat.chatId : '',
+        platform: chat ? chat.platform : 'telegram',
+        username: supportUsername(),
+        message: message
+      })
+    })
+      .then(function (res) {
+        return res.json().catch(function () { throw new Error('HTTP ' + res.status); })
+          .then(function (body) {
+            if (!res.ok || body.success === false) {
+              throw new Error(body.error || 'HTTP ' + res.status);
+            }
+            return body;
+          });
+      })
+      .then(function () {
+        closeSheet();
+        showToast(t('support.sent'));
+      })
+      .catch(function (err) {
+        console.error('TIU GO: не удалось отправить обращение', err);
+        showToast(err.message || t('support.error'));
+      })
+      .then(function () {
+        el.supportSend.disabled = false;
+        setText(el.supportSend, t('support.send'));
+      });
+  }
+
+  /** Как подписать обращение в админке. Без данных — 'anonymous'. */
+  function supportUsername() {
+    var tg = tgApp();
+    var user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+
+    if (user) {
+      return user.username || [user.first_name, user.last_name].filter(Boolean).join(' ');
+    }
+
+    var mx = maxApp();
+    var mxUser = mx && ((mx.initDataUnsafe && mx.initDataUnsafe.user) || mx.user);
+
+    if (mxUser) {
+      return mxUser.username || mxUser.name ||
+        [mxUser.first_name, mxUser.last_name].filter(Boolean).join(' ');
+    }
+
+    return 'anonymous';
+  }
+
+  el.supportLink.addEventListener('click', function () {
+    closeSheet();
+    // Ждём, пока уедет лист настроек: две модалки разом выглядят поломкой
+    setTimeout(openSupport, 280);
+  });
+
+  el.supportSend.addEventListener('click', sendSupport);
+  el.supportCancel.addEventListener('click', closeSheet);
 
   el.aboutLink.addEventListener('click', function () {
     haptic();

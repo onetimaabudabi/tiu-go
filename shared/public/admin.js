@@ -35,7 +35,7 @@
 
   var STATUS_ORDER = ['working', 'broken', 'maintenance'];
 
-  var TABS = ['lifts', 'stats', 'reports', 'cast'];
+  var TABS = ['lifts', 'stats', 'reports', 'support', 'cast'];
 
   // Причины жалоб — те же ключи, что шлёт мини-апп (см. report.* в i18n.js).
   // Незнакомый ключ показываем как есть: лучше сырое значение, чем «Другое»,
@@ -91,6 +91,12 @@
     reportsSub: $('reports-sub'),
     reportsList: $('reports-list'),
     reportsRefresh: $('btn-reports-refresh'),
+
+    supportBadge: $('tab-support-badge'),
+    supportMetrics: $('support-metrics'),
+    supportSub: $('support-sub'),
+    supportList: $('support-list'),
+    supportRefresh: $('btn-support-refresh'),
 
     castText: $('cast-text'),
     castFile: $('cast-file'),
@@ -313,6 +319,8 @@
       }, STATS_REFRESH_MS);
     } else if (activeTab === 'reports') {
       loadReports();
+    } else if (activeTab === 'support') {
+      loadSupport();
     } else {
       loadCast();
     }
@@ -515,6 +523,9 @@
     el.reportsBadge.textContent = body.reports;
     el.reportsBadge.hidden = !body.reports;
 
+    el.supportBadge.textContent = body.supportOpen;
+    el.supportBadge.hidden = !body.supportOpen;
+
     // Память вместо Redis — значит, цифры обнулятся при перезапуске.
     // Молчать об этом нельзя: человек решит, что статистика просто врёт
     if (body.storage === 'memory') {
@@ -671,6 +682,126 @@
   el.reportsRefresh.addEventListener('click', function () {
     el.reportsRefresh.disabled = true;
     loadReports().then(function () { el.reportsRefresh.disabled = false; });
+  });
+
+  // ---------- Вкладка «Поддержка» ----------
+
+  function ticketCard(ticket) {
+    var replied = ticket.status === 'replied';
+
+    // Подтверждён ли отправитель. Для неподтверждённых ответ уйдёт
+    // по адресу, который прислал клиент, — об этом честно пишем
+    var trust = ticket.verified
+      ? '<span class="ticket__tag ticket__tag--ok">подтверждён</span>'
+      : '<span class="ticket__tag ticket__tag--warn">не подтверждён</span>';
+
+    var platform = '<span class="ticket__tag ticket__tag--plain">' +
+      (ticket.platform === 'max' ? 'MAX' : 'Telegram') + '</span>';
+
+    var body = replied
+      ? '<div class="ticket__reply"><b>Ответ отправлен ' +
+          reportTime(ticket.repliedAt || ticket.createdAt) + '</b>' +
+          escapeHtml(ticket.replyText || '') + '</div>'
+      : '<div class="ticket__form">' +
+          '<textarea class="ticket__area" data-reply ' +
+            'placeholder="Ответ уйдёт человеку в чат с ботом"></textarea>' +
+          '<div class="ticket__actions">' +
+            '<button class="btn btn--accent" type="button" data-send>' +
+              ICONS.icon('send') + ' Ответить</button>' +
+            '<span class="ticket__hint" data-state></span>' +
+          '</div>' +
+        '</div>';
+
+    return '<article class="ticket" data-id="' + escapeHtml(ticket.id) + '" ' +
+        'data-status="' + escapeHtml(ticket.status) + '">' +
+        '<div class="ticket__head">' +
+          '<span class="ticket__user">' + escapeHtml(ticket.username || 'anonymous') + '</span>' +
+          platform + trust +
+          '<span class="ticket__time">' + reportTime(ticket.createdAt) + '</span>' +
+        '</div>' +
+        '<div class="ticket__message">' + escapeHtml(ticket.message || '') + '</div>' +
+        body +
+      '</article>';
+  }
+
+  function renderSupport(body) {
+    el.supportMetrics.innerHTML =
+      metricCard('support', 'Всего обращений', body.total,
+        body.total ? 'последнее ' + reportTime(body.tickets[0].createdAt) : 'пока пусто') +
+      metricCard('warning', 'Ждут ответа', body.open,
+        body.open ? 'ответьте из карточки ниже' : 'все обработаны') +
+      metricCard('check', 'Отвечено', body.total - body.open,
+        'ответ ушёл в чат с ботом');
+
+    el.supportBadge.textContent = body.open;
+    el.supportBadge.hidden = !body.open;
+
+    if (!body.total) {
+      el.supportList.innerHTML = '<p class="tickets__empty">Пока нет обращений ' +
+        'от пользователей. Они появятся здесь, когда кто-нибудь напишет через ' +
+        '«Связаться с поддержкой» в настройках мини-аппа.</p>';
+      return;
+    }
+
+    el.supportSub.textContent = 'Вопросы из мини-аппа, новые сверху. ' +
+      'Ответ уходит человеку в чат с ботом.';
+
+    el.supportList.innerHTML = body.tickets.map(ticketCard).join('');
+  }
+
+  function loadSupport() {
+    return api('/support')
+      .then(renderSupport)
+      .catch(function (err) {
+        if (err.message === 'Нужен вход') return;
+        el.supportList.innerHTML = '<p class="tickets__empty">Не удалось загрузить: ' +
+          escapeHtml(err.message) + '</p>';
+      });
+  }
+
+  /** Отправляет ответ и перерисовывает список. */
+  function replyToTicket(card) {
+    var id = card.dataset.id;
+    var area = card.querySelector('[data-reply]');
+    var button = card.querySelector('[data-send]');
+    var state = card.querySelector('[data-state]');
+
+    var replyText = area.value.trim();
+
+    if (!replyText) {
+      state.textContent = 'Напишите ответ';
+      return;
+    }
+
+    button.disabled = true;
+    state.textContent = 'Отправляем...';
+
+    post('/support/' + encodeURIComponent(id) + '/reply', { replyText: replyText })
+      .then(function (body) {
+        // Доставка и сохранение — разные вещи: ответ записан в любом случае,
+        // а дойти мог и не дойти, если человек заблокировал бота
+        if (body.delivered) toast('Ответ отправлен');
+        else toast(body.note || 'Ответ сохранён, но не доставлен', 'error');
+
+        return loadSupport();
+      })
+      .catch(function (err) {
+        if (err.message !== 'Нужен вход') {
+          state.textContent = 'Ошибка: ' + err.message;
+          toast('Ошибка: ' + err.message, 'error');
+        }
+        button.disabled = false;
+      });
+  }
+
+  el.supportList.addEventListener('click', function (event) {
+    var send = event.target.closest('[data-send]');
+    if (send) replyToTicket(send.closest('.ticket'));
+  });
+
+  el.supportRefresh.addEventListener('click', function () {
+    el.supportRefresh.disabled = true;
+    loadSupport().then(function () { el.supportRefresh.disabled = false; });
   });
 
   // ---------- Вкладка «Рассылка» ----------
